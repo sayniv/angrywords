@@ -1023,6 +1023,9 @@
 .tutorial-reveal dd { margin: 0; color: #566251; font-size: 11px; line-height: 1.6; }
 .tutorial-example-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
 .tutorial-example-nav .button { min-height: 42px; padding: 11px 14px; font-size: 11px; }
+.tutorial-next-action { color: var(--ink); background: var(--gold); box-shadow: 0 2px 0 #b48f32; }
+.tutorial-next-action:hover:not(:disabled) { background: #dfb83f; }
+.tutorial-next-action:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .tutorial-example-nav .button:disabled { cursor: not-allowed; opacity: .45; transform: none; }
 .tutorial-bottom-note { display: flex; align-items: center; gap: 13px; margin-top: 34px; padding: 17px 0 0; border-top: 1px solid #d9cebf; }
 .tutorial-bottom-mark { display: grid; place-items: center; width: 30px; height: 30px; color: #fff9ef; background: var(--sage); border-radius: 50%; font: 9px var(--app-font-mono); }

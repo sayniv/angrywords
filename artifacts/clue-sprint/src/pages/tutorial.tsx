@@ -191,7 +191,7 @@ export default function TutorialPage() {
                 </div>}
                 <div className="tutorial-example-nav">
                   <button type="button" className="button button-outline" onClick={() => changeExample(exampleIndex - 1)} disabled={exampleIndex === 0} data-testid="button-previous-example"><ArrowLeft size={15} /> Previous</button>
-                  <button type="button" className="button button-primary" onClick={() => changeExample(exampleIndex + 1)} disabled={exampleIndex === activeType.examples.length - 1} data-testid="button-next-example">Next example <ArrowRight size={15} /></button>
+                  <button type="button" className="button tutorial-next-action" onClick={() => changeExample(exampleIndex + 1)} disabled={exampleIndex === activeType.examples.length - 1} data-testid="button-next-example">Next example <ArrowRight size={15} /></button>
                 </div>
               </article>
             </div>
