@@ -8,6 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "test": "tsx --test test/*.test.mts",
+    "fixtures:seed": "tsx ./src/scripts/clue-fixtures.ts seed",
+    "fixtures:cleanup": "tsx ./src/scripts/clue-fixtures.ts cleanup",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

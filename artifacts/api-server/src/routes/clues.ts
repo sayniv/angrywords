@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { and, asc, avg, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, avg, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, notLike, sql } from "drizzle-orm";
 import {
   AttemptResult,
   CreateClueBody,
@@ -1462,6 +1462,7 @@ router.get("/leaderboards/solvers", async (_req, res): Promise<void> => {
       and(
         isNotNull(solverProgressTable.solvedAt),
         isNotNull(solverProgressTable.elapsedSeconds),
+        notLike(solverProgressTable.userId, "clue-fixture-solver-%"),
       ),
     )
     .groupBy(solverProgressTable.userId)
