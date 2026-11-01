@@ -10,6 +10,9 @@ const api = vi.hoisted(() => ({
   infiniteQuery: vi.fn(),
   solverLeaderboard: vi.fn(),
   setterLeaderboard: vi.fn(),
+  getClue: vi.fn(),
+  clueLeaderboard: vi.fn(),
+  mutation: vi.fn(),
 }));
 
 vi.mock('@clerk/react', () => ({
@@ -30,12 +33,25 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 });
 
 vi.mock('@workspace/api-client-react', () => ({
+  getGetClueQueryKey: (slug: string) => ['clue', slug],
+  getGetClueLeaderboardQueryKey: (slug: string) => ['clue-leaderboard', slug],
+  getGetMyDashboardQueryKey: () => ['dashboard'],
   getGetMyProfileQueryKey: () => ['profile'],
   getGetSolverLeaderboardQueryKey: () => ['solver-leaderboard'],
   getGetSetterLeaderboardQueryKey: () => ['setter-leaderboard'],
   getListCluesQueryKey: (params?: unknown) => ['clues', params],
   listClues: api.listClues,
   useGetMyProfile: () => ({ data: undefined }),
+  useGetClue: api.getClue,
+  useGetClueLeaderboard: api.clueLeaderboard,
+  useSubmitAttempt: api.mutation,
+  useGiveUpClue: api.mutation,
+  useRevealClueHint: api.mutation,
+  useStartClue: api.mutation,
+  useRetireClue: api.mutation,
+  useRateClue: api.mutation,
+  useReportClue: api.mutation,
+  useSubmitClueAppeal: api.mutation,
   useGetSolverLeaderboard: api.solverLeaderboard,
   useGetSetterLeaderboard: api.setterLeaderboard,
 }));
@@ -66,6 +82,26 @@ function clue(id: number) {
   };
 }
 
+function challengeClue(id: number) {
+  return {
+    ...clue(id),
+    wordplay: null,
+    hintCount: 0,
+    revealedAnswer: null,
+    isOwner: false,
+    isBlocked: false,
+    userHasReported: false,
+    userRevealedHints: [],
+    userStartedAt: null,
+    userAssistEnabled: null,
+    userCompleted: null,
+    userAttemptsUsed: null,
+    userElapsedSeconds: null,
+    userSolved: null,
+    userRating: null,
+  };
+}
+
 function setupClueQuery(overrides: Record<string, unknown> = {}) {
   const fetchNextPage = vi.fn();
   const refetch = vi.fn();
@@ -81,6 +117,31 @@ function setupClueQuery(overrides: Record<string, unknown> = {}) {
     ...overrides,
   });
   return { fetchNextPage, refetch };
+}
+
+function setupChallengeQueries() {
+  const clues = new Map<string, ReturnType<typeof challengeClue>>();
+  api.getClue.mockImplementation((slug: string) => {
+    if (!clues.has(slug)) clues.set(slug, challengeClue(Number(slug.replace('clue-', ''))));
+    return {
+      data: clues.get(slug),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  });
+  api.clueLeaderboard.mockReturnValue({
+    data: { noHintsNoAssist: [], hintsUsedNoAssist: [], assistUsed: [] },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+  api.mutation.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    reset: vi.fn(),
+  });
 }
 
 describe('Home and Explore destinations', () => {
@@ -300,5 +361,70 @@ describe('Home and Explore destinations', () => {
 
     await userEvent.setup().click(screen.getByTestId('button-retry-clues'));
     expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it('opens and reloads a clue URL directly', () => {
+    setupChallengeQueries();
+
+    const view = renderAppAt('/clue/clue-41');
+    expect(screen.getByTestId('text-challenge-clue').textContent).toBe('A public clue 41');
+    expect(api.getClue).toHaveBeenLastCalledWith('clue-41', expect.objectContaining({
+      query: expect.objectContaining({ enabled: true }),
+    }));
+
+    view.unmount();
+    render(createElement(App));
+
+    expect(screen.getByTestId('text-challenge-clue').textContent).toBe('A public clue 41');
+    expect(api.getClue).toHaveBeenLastCalledWith('clue-41', expect.objectContaining({
+      query: expect.objectContaining({ enabled: true }),
+    }));
+  });
+
+  it('returns to the catalog and reopens the same clue through browser history', async () => {
+    setupChallengeQueries();
+    api.listClues.mockReturnValue({
+      data: [clue(42)],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    setupClueQuery({ data: { pages: [{ items: [clue(42)], nextCursor: null }] } });
+
+    renderAppAt('/explore');
+    await userEvent.setup().click(screen.getByTestId('card-clue-42'));
+    expect(screen.getByTestId('text-challenge-clue').textContent).toBe('A public clue 42');
+    expect(window.location.pathname).toBe('/clue/clue-42');
+
+    window.history.back();
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/explore');
+      expect(screen.getByTestId('card-clue-42')).toBeTruthy();
+    });
+
+    window.history.forward();
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/clue/clue-42');
+      expect(screen.getByTestId('text-challenge-clue').textContent).toBe('A public clue 42');
+    });
+  });
+
+  it('keeps distinct unavailable screens for retired and missing clue links', () => {
+    setupChallengeQueries();
+    api.getClue.mockImplementation((slug: string) => ({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { status: slug === 'retired-clue' ? 410 : 404 },
+      refetch: vi.fn(),
+    }));
+
+    const retired = renderAppAt('/clue/retired-clue');
+    expect(screen.getByRole('heading', { name: 'This clue has been retired.' })).toBeTruthy();
+    retired.unmount();
+
+    window.history.replaceState({}, '', '/clue/missing-clue');
+    render(createElement(App));
+    expect(screen.getByRole('heading', { name: 'This clue has slipped away.' })).toBeTruthy();
   });
 });
