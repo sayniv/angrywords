@@ -576,7 +576,7 @@ function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: str
 
 function PublicLeaderboard({ title, note, mode, data, loading, failed, retry }: {
   title: string; note: string; mode: 'solver' | 'setter';
-  data?: Array<{ rank: number; displayName: string; averageSeconds?: number; solvedCount?: number; averageRating?: number; ratingCount?: number }>;
+  data?: Array<{ rank: number; displayName: string; averageSeconds?: number; solvedCount?: number; averageRating?: number; ratingCount?: number; isCurrentUser?: boolean }>;
   loading: boolean; failed: boolean; retry: () => void;
 }) {
   return <section className="public-board" data-testid={`leaderboard-${mode}`}>
@@ -585,7 +585,7 @@ function PublicLeaderboard({ title, note, mode, data, loading, failed, retry }: 
     {loading ? <LeaderboardSkeleton /> : failed ? <div className="board-empty"><p>Could not load the rankings.</p><button className="text-button" onClick={retry}>Try again</button></div> : data?.length ? <ol className="leaderboard">
       {data.slice(0, 5).map((entry) => <li className={`leader-row ${entry.rank === 1 ? 'leader-first' : ''}`} key={`${mode}-${entry.rank}-${entry.displayName}`} data-testid={`row-${mode}-leader-${entry.rank}`}>
         <span className={`rank-badge rank-${entry.rank}`}>{entry.rank === 1 ? <Crown size={15} /> : String(entry.rank).padStart(2, '0')}</span>
-        <div className="leader-person"><strong>{entry.displayName}</strong><span>{mode === 'solver' ? `${entry.solvedCount ?? 0} solved` : `${entry.ratingCount ?? 0} ratings`}</span></div>
+        <div className="leader-person"><div className="leader-name"><strong>{entry.displayName}</strong>{mode === 'solver' && entry.isCurrentUser && <span className="leader-you" aria-label="Your ranking" data-testid="text-current-solver">You</span>}</div><span>{mode === 'solver' ? `${entry.solvedCount ?? 0} solved` : `${entry.ratingCount ?? 0} ratings`}</span></div>
         <span className="leader-time">{mode === 'solver' ? formatTime(Math.round(entry.averageSeconds ?? 0)) : <span className="rating-inline"><Star size={13} fill="currentColor" /> {(entry.averageRating ?? 0).toFixed(1)}</span>}</span>
       </li>)}
     </ol> : <div className="board-empty"><div className="empty-medal"><Trophy size={20} /></div><strong>The board is waiting.</strong><p>Be among the first to make your mark.</p></div>}

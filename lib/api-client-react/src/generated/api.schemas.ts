@@ -366,6 +366,7 @@ export interface SolverLeaderboardEntry {
   displayName: string;
   averageSeconds: number;
   solvedCount: number;
+  isCurrentUser?: boolean;
 }
 
 export interface SetterLeaderboardEntry {

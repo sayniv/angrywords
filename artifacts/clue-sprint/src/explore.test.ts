@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Router } from 'wouter';
 import App, { BrowseCluesLink, ClueLeaderboardSection, ExplorePage, Header, HomePage, NextClueRecommendation } from './App';
@@ -210,6 +210,42 @@ describe('Home and Explore destinations', () => {
     expect(screen.getByTestId('link-find-clue').textContent).toContain('Explore clues');
     expect(screen.queryByTestId('card-clue-1')).toBeNull();
     expect(api.listClues).not.toHaveBeenCalled();
+  });
+
+  it('marks the signed-in solver without changing their ranking details', () => {
+    api.solverLeaderboard.mockReturnValue({
+      data: [
+        { rank: 1, displayName: 'PuzzleFriend', averageSeconds: 42.5, solvedCount: 8, isCurrentUser: true },
+        { rank: 2, displayName: 'AnotherSolver', averageSeconds: 49, solvedCount: 6 },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    api.setterLeaderboard.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() });
+
+    renderWithRouter(createElement(HomePage));
+
+    const ownRow = screen.getByTestId('row-solver-leader-1');
+    expect(within(ownRow).getByTestId('text-current-solver').textContent).toBe('You');
+    expect(ownRow.textContent).toContain('PuzzleFriend');
+    expect(ownRow.textContent).toContain('8 solved');
+    expect(ownRow.textContent).toContain('0:43');
+  });
+
+  it('keeps the solver board unmarked when no personal marker is returned', () => {
+    api.solverLeaderboard.mockReturnValue({
+      data: [{ rank: 1, displayName: 'PuzzleFriend', averageSeconds: 42.5, solvedCount: 8 }],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    api.setterLeaderboard.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() });
+
+    renderWithRouter(createElement(HomePage));
+
+    expect(screen.getByTestId('row-solver-leader-1').textContent).toContain('8 solved');
+    expect(screen.queryByTestId('text-current-solver')).toBeNull();
   });
 
   it('routes clue-browse links from challenge and dashboard copy to the catalog', () => {

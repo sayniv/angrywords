@@ -1517,7 +1517,7 @@ router.post(
   },
 );
 
-router.get("/leaderboards/solvers", async (_req, res): Promise<void> => {
+router.get("/leaderboards/solvers", async (req, res): Promise<void> => {
   const averageTime = avg(solverProgressTable.elapsedSeconds);
   const rows = await db
     .select({
@@ -1536,6 +1536,7 @@ router.get("/leaderboards/solvers", async (_req, res): Promise<void> => {
     .groupBy(solverProgressTable.userId)
     .orderBy(asc(averageTime), desc(count()))
     .limit(20);
+  const currentUserId = getAuth(req).userId;
   const publicIds = await publicIdsForUsers(rows.map((row) => row.userId));
   res.json(
     GetSolverLeaderboardResponse.parse(
@@ -1544,6 +1545,7 @@ router.get("/leaderboards/solvers", async (_req, res): Promise<void> => {
       displayName: publicIds.get(row.userId) ?? "Guest solver",
       averageSeconds: Number(Number(row.averageSeconds ?? 0).toFixed(1)),
       solvedCount: Number(row.solvedCount),
+      ...(row.userId === currentUserId ? { isCurrentUser: true } : {}),
       })),
     ),
   );

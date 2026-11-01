@@ -307,7 +307,8 @@ export const GetSolverLeaderboardResponseItem = zod.object({
   "rank": zod.number().int(),
   "displayName": zod.string(),
   "averageSeconds": zod.number(),
-  "solvedCount": zod.number().int()
+  "solvedCount": zod.number().int(),
+  "isCurrentUser": zod.boolean().optional()
 })
 export const GetSolverLeaderboardResponse = zod.array(GetSolverLeaderboardResponseItem)
 

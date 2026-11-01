@@ -937,6 +937,7 @@ components:
         displayName: { type: string }
         averageSeconds: { type: number }
         solvedCount: { type: integer }
+        isCurrentUser: { type: boolean }
     SetterLeaderboardEntry:
       type: object
       required: [rank, displayName, averageRating, ratingCount]
