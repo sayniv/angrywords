@@ -47,7 +47,7 @@ export const tutorialIntroduction = {
     "Not every clue uses every part in the same way. Some clues use more than one device, and double definitions have no separate wordplay.",
 };
 
-export const tutorialTypes: TutorialType[] = [
+const tutorialTypeContent: TutorialType[] = [
   {
     id: "charades",
     title: "Charades",
@@ -168,7 +168,7 @@ export const tutorialTypes: TutorialType[] = [
   },
   {
     id: "hidden",
-    title: "Hidden / telescopic",
+    title: "Telescopic",
     summary: "Find the answer sitting inside the clue’s letters.",
     lesson:
       "Hidden-word indicators include “in”, “within”, “part of”, and “concealed”. Read the fodder straight through; the answer’s letters appear consecutively. Some guides call these telescopic indicators.",
@@ -521,3 +521,20 @@ export const tutorialTypes: TutorialType[] = [
     ],
   },
 ];
+
+const tutorialStyleOrder = [
+  "hidden",
+  "anagrams",
+  "homophones",
+  "containers",
+  "reversals",
+  "deletions",
+  "charades",
+  "double-definitions",
+] as const;
+
+export const tutorialTypes = tutorialStyleOrder.map((id) => {
+  const type = tutorialTypeContent.find((item) => item.id === id);
+  if (!type) throw new Error(`Missing tutorial content for style "${id}".`);
+  return type;
+});
