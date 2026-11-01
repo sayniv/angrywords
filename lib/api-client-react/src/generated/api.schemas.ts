@@ -195,6 +195,7 @@ export interface LeaderboardEntry {
   elapsedSeconds: number;
   attemptsUsed: number;
   solvedAt: string;
+  isCurrentUser?: boolean;
 }
 
 export interface ClueLeaderboard {

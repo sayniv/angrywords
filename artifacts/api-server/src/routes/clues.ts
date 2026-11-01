@@ -1209,7 +1209,7 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
   ]);
   const rows = [...noHintRows, ...hintRows, ...assistRows];
   const publicIds = await publicIdsForUsers(rows.map((row) => row.userId));
-  const entries = buildClueLeaderboardEntries(rows, publicIds);
+  const entries = buildClueLeaderboardEntries(rows, publicIds, getAuth(req).userId ?? undefined);
   res.json(GetClueLeaderboardResponse.parse(entries));
 });
 

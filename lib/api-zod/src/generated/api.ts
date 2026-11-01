@@ -337,21 +337,24 @@ export const GetClueLeaderboardResponse = zod.object({
   "displayName": zod.string(),
   "elapsedSeconds": zod.number().int(),
   "attemptsUsed": zod.number().int(),
-  "solvedAt": zod.coerce.date()
+  "solvedAt": zod.coerce.date(),
+  "isCurrentUser": zod.boolean().optional()
 })),
   "hintsUsedNoAssist": zod.array(zod.object({
   "rank": zod.number().int(),
   "displayName": zod.string(),
   "elapsedSeconds": zod.number().int(),
   "attemptsUsed": zod.number().int(),
-  "solvedAt": zod.coerce.date()
+  "solvedAt": zod.coerce.date(),
+  "isCurrentUser": zod.boolean().optional()
 })),
   "assistUsed": zod.array(zod.object({
   "rank": zod.number().int(),
   "displayName": zod.string(),
   "elapsedSeconds": zod.number().int(),
   "attemptsUsed": zod.number().int(),
-  "solvedAt": zod.coerce.date()
+  "solvedAt": zod.coerce.date(),
+  "isCurrentUser": zod.boolean().optional()
 }))
 })
 

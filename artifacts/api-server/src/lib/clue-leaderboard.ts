@@ -14,6 +14,7 @@ interface ClueLeaderboardEntry {
   elapsedSeconds: number;
   attemptsUsed: number;
   solvedAt: Date;
+  isCurrentUser?: true;
 }
 
 export interface ClueLeaderboardEntries {
@@ -37,6 +38,7 @@ function compareSolves(left: ClueLeaderboardRow, right: ClueLeaderboardRow): num
 export function buildClueLeaderboardEntries(
   rows: ClueLeaderboardRow[],
   publicIds: Map<string, string>,
+  currentUserId?: string,
 ): ClueLeaderboardEntries {
   const eligible = rows.filter((row) => row.solvedAt !== null && row.failedAt === null);
   const buildCategory = (
@@ -57,6 +59,7 @@ export function buildClueLeaderboardEntries(
         elapsedSeconds: row.elapsedSeconds ?? 0,
         attemptsUsed: row.attemptsUsed,
         solvedAt: row.solvedAt!,
+        ...(currentUserId && row.userId === currentUserId ? { isCurrentUser: true as const } : {}),
       }));
 
   return {

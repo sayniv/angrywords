@@ -85,6 +85,7 @@ test("each leaderboard category keeps its own 50 fastest eligible solves", () =>
   const entries = buildClueLeaderboardEntries(
     [...noHintSolves, ...hintedSolves, ...assistSolves].reverse(),
     new Map(),
+    "no-hint-59",
   );
 
   assert.equal(entries.noHintsNoAssist.length, 50);
@@ -94,6 +95,7 @@ test("each leaderboard category keeps its own 50 fastest eligible solves", () =>
     entries.noHintsNoAssist.map(({ rank, elapsedSeconds }) => [rank, elapsedSeconds]),
     Array.from({ length: 50 }, (_, index) => [index + 1, 100 + index]),
   );
+  assert.equal(entries.noHintsNoAssist.some(({ isCurrentUser }) => isCurrentUser), false);
   assert.deepEqual(
     entries.hintsUsedNoAssist.map(({ rank, elapsedSeconds }) => [rank, elapsedSeconds]),
     Array.from({ length: 50 }, (_, index) => [index + 1, 200 + index]),
@@ -173,6 +175,28 @@ test("hint penalties are retained in the recorded leaderboard time", () => {
   assert.equal(entries.noHintsNoAssist.length, 0);
 });
 
+test("only the authenticated viewer's own solve is marked without changing rank data", () => {
+  const rows = [
+    row({ userId: "other-solver", elapsedSeconds: 90, solvedAt: solvedAt(1) }),
+    row({ userId: "current-solver", elapsedSeconds: 100, attemptsUsed: 3, solvedAt: solvedAt(2) }),
+  ];
+  const publicIds = new Map([
+    ["other-solver", "Other solver"],
+    ["current-solver", "Current solver"],
+  ]);
+  const entries = buildClueLeaderboardEntries(rows, publicIds, "current-solver");
+
+  assert.deepEqual(
+    entries.noHintsNoAssist.map(({ rank, displayName, elapsedSeconds, attemptsUsed, isCurrentUser }) =>
+      [rank, displayName, elapsedSeconds, attemptsUsed, isCurrentUser]),
+    [
+      [1, "Other solver", 90, 2, undefined],
+      [2, "Current solver", 100, 3, true],
+    ],
+  );
+  assert.equal(buildClueLeaderboardEntries(rows, publicIds).noHintsNoAssist[1]?.isCurrentUser, undefined);
+});
+
 test("the clue leaderboard API contract includes empty and populated tiers", () => {
   const parsed = GetClueLeaderboardResponse.parse({
     noHintsNoAssist: [],
@@ -183,6 +207,7 @@ test("the clue leaderboard API contract includes empty and populated tiers", () 
       elapsedSeconds: 245,
       attemptsUsed: 2,
       solvedAt: solvedAt(0),
+      isCurrentUser: true,
     }],
   });
 
@@ -190,4 +215,5 @@ test("the clue leaderboard API contract includes empty and populated tiers", () 
   assert.deepEqual(parsed.hintsUsedNoAssist, []);
   assert.equal(parsed.assistUsed.length, 1);
   assert.equal(parsed.assistUsed[0]?.displayName, "Hint Solver");
+  assert.equal(parsed.assistUsed[0]?.isCurrentUser, true);
 });

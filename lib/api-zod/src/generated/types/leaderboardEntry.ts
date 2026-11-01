@@ -12,4 +12,5 @@ export interface LeaderboardEntry {
   elapsedSeconds: number;
   attemptsUsed: number;
   solvedAt: Date;
+  isCurrentUser?: boolean;
 }

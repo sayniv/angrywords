@@ -784,6 +784,7 @@ components:
         elapsedSeconds: { type: integer }
         attemptsUsed: { type: integer }
         solvedAt: { type: string, format: date-time }
+        isCurrentUser: { type: boolean }
     ClueLeaderboard:
       type: object
       required: [noHintsNoAssist, hintsUsedNoAssist, assistUsed]

@@ -56,6 +56,7 @@ type ClueLeaderboardEntry = {
   elapsedSeconds: number;
   attemptsUsed: number;
   solvedAt: string;
+  isCurrentUser?: boolean;
 };
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -618,7 +619,7 @@ export function ClueLeaderboardSection({ tier, description, category, entries, l
           <span className={`rank-badge rank-${entry.rank} tier-rank-badge`} aria-label={`${entry.rank}${entry.rank === 1 ? 'st' : entry.rank === 2 ? 'nd' : entry.rank === 3 ? 'rd' : 'th'} place`}>
             {entry.rank === 1 ? <TierWinnerIcon tier={tier} /> : String(entry.rank).padStart(2, '0')}
           </span>
-          <div className="leader-person"><strong>{entry.displayName}</strong><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
+          <div className="leader-person"><div className="leader-name"><strong>{entry.displayName}</strong>{entry.isCurrentUser && <span className="leader-you" aria-label="Your solve" data-testid={`text-own-solve-${category}`}>You</span>}</div><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
           <span className="leader-time">{formatTime(entry.elapsedSeconds)}</span>
         </li>)}
       </ol>
@@ -824,7 +825,12 @@ function ChallengePage() {
     query: { queryKey: clueQueryKey, enabled: authLoaded },
   });
   const { data: leaderboard, isLoading: leaderboardLoading, isError: leaderboardError, refetch: refetchLeaderboard } =
-    useGetClueLeaderboard(slug, { query: { queryKey: getGetClueLeaderboardQueryKey(slug), staleTime: 15_000, refetchOnMount: 'always' } });
+    useGetClueLeaderboard(slug, { query: {
+      queryKey: [...getGetClueLeaderboardQueryKey(slug), authLoaded && isSignedIn ? user?.id ?? 'signed-in' : 'signed-out'],
+      enabled: authLoaded,
+      staleTime: 15_000,
+      refetchOnMount: 'always',
+    } });
   const submitAttempt = useSubmitAttempt();
   const giveUpClue = useGiveUpClue();
   const revealClueHint = useRevealClueHint();

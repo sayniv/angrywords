@@ -563,6 +563,19 @@ describe('Race So Far medal tiers', () => {
     });
   });
 
+  it('marks only the viewer’s solve without changing its rank or time', () => {
+    const entries = [
+      { rank: 1, displayName: 'First solver', elapsedSeconds: 63, attemptsUsed: 1, solvedAt: '2026-11-01T12:00:00Z' },
+      { rank: 2, displayName: 'Your public ID', elapsedSeconds: 81, attemptsUsed: 2, solvedAt: '2026-11-01T12:01:00Z', isCurrentUser: true },
+    ];
+    renderClueLeaderboard('silver', 'hints-no-assist', { entries });
+
+    expect(screen.getByTestId('text-own-solve-hints-no-assist').textContent).toBe('You');
+    expect(screen.getByTestId('row-leader-hints-no-assist-2').textContent).toContain('02');
+    expect(screen.getByTestId('row-leader-hints-no-assist-2').textContent).toContain('1:21');
+    expect(screen.queryByTestId('text-own-solve-gold')).toBeNull();
+  });
+
   it('defines distinct heading and rank accent colors for all three tiers', () => {
     const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
     for (const tier of ['gold', 'silver', 'bronze']) {
