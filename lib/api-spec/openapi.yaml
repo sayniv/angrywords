@@ -14,6 +14,8 @@ tags:
     description: Cryptic clue challenges
   - name: profile
     description: Signed-in solver profile
+  - name: moderation
+    description: Clue appeal review
 paths:
   /healthz:
     get:
@@ -153,6 +155,88 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClueRetired"
+  /clues/{slug}/appeal:
+    post:
+      operationId: submitClueAppeal
+      tags: [clues]
+      summary: Appeal a blocked clue
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClueAppealInput"
+      responses:
+        "201":
+          description: Appeal submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueAppealResult"
+        "403":
+          description: Only the setter can appeal this clue
+        "404":
+          description: Clue not found
+        "409":
+          description: Clue is not eligible or already has a pending appeal
+  /review/appeals:
+    get:
+      operationId: listPendingClueAppeals
+      tags: [moderation]
+      summary: List pending clue appeals for reviewers
+      security:
+        - clerkSession: []
+      responses:
+        "200":
+          description: Pending appeals with clue and report details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClueAppealReview"
+        "403":
+          description: Reviewer access required
+  /review/appeals/{appealId}/decision:
+    post:
+      operationId: reviewClueAppeal
+      tags: [moderation]
+      summary: Restore or retire an appealed clue
+      security:
+        - clerkSession: []
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClueAppealDecision"
+      responses:
+        "200":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueAppealDecisionResult"
+        "403":
+          description: Reviewer access required
+        "404":
+          description: Appeal not found
+        "409":
+          description: Appeal has already been reviewed or clue is unavailable
   /clues/{slug}/rating:
     put:
       operationId: rateClue
@@ -436,6 +520,12 @@ components:
         userStartedAt: { type: ["string", "null"], format: date-time }
         userSolved: { type: ["boolean", "null"] }
         revealedAnswer: { type: ["string", "null"] }
+        isBlocked: { type: boolean }
+        reportCount: { type: ["integer", "null"] }
+        appealStatus:
+          type: ["string", "null"]
+          enum: [pending, restored, retired, null]
+        appealReason: { type: ["string", "null"] }
     ClueSummary:
       type: object
       required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, solveCount, averageRating, ratingCount, isBlocked, createdAt]
@@ -568,6 +658,45 @@ components:
         threshold: { type: integer, enum: [100] }
         blocked: { type: boolean }
         alreadyReported: { type: boolean }
+    ClueAppealInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 1000 }
+    ClueAppealResult:
+      type: object
+      required: [id, status, reportCount, submittedAt]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [pending] }
+        reportCount: { type: integer }
+        submittedAt: { type: string, format: date-time }
+    ClueAppealReview:
+      type: object
+      required: [id, slug, clue, answer, wordplay, setterName, reason, reportCount, submittedAt]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        clue: { type: string }
+        answer: { type: string }
+        wordplay: { type: ["string", "null"] }
+        setterName: { type: string }
+        reason: { type: string }
+        reportCount: { type: integer }
+        submittedAt: { type: string, format: date-time }
+    ClueAppealDecision:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [restore, retire] }
+    ClueAppealDecisionResult:
+      type: object
+      required: [id, status, slug, reviewedAt]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [restored, retired] }
+        slug: { type: string }
+        reviewedAt: { type: string, format: date-time }
     SolverLeaderboardEntry:
       type: object
       required: [rank, displayName, averageSeconds, solvedCount]

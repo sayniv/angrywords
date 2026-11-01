@@ -23,6 +23,11 @@ import type {
   AttemptInput,
   AttemptResult,
   Clue,
+  ClueAppealDecision,
+  ClueAppealDecisionResult,
+  ClueAppealInput,
+  ClueAppealResult,
+  ClueAppealReview,
   ClueInput,
   ClueRatingInput,
   ClueRatingSummary,
@@ -540,6 +545,261 @@ export const useReportClue = <TError = ErrorType<void | ClueRetired>,
         TContext
       > => {
       return useMutation(getReportClueMutationOptions(options));
+    }
+
+export const getSubmitClueAppealUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}/appeal`
+}
+
+/**
+ * @summary Appeal a blocked clue
+ */
+export const submitClueAppeal = async (slug: string,
+    clueAppealInput: ClueAppealInput, options?: Parameters<typeof customFetch>[1]): Promise<ClueAppealResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ClueAppealResult>(getSubmitClueAppealUrl(slug),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clueAppealInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitClueAppealMutationKey = () => ['submitClueAppeal'] as const;
+
+export const getSubmitClueAppealMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitClueAppeal>>, TError,SubmitClueAppealMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitClueAppeal>>, TError,SubmitClueAppealMutationVariables, TContext> => {
+
+const mutationKey = getSubmitClueAppealMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitClueAppeal>>, SubmitClueAppealMutationVariables> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  submitClueAppeal(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitClueAppealMutationResult = NonNullable<Awaited<ReturnType<typeof submitClueAppeal>>>
+    export type SubmitClueAppealMutationBody = BodyType<ClueAppealInput>
+    export type SubmitClueAppealMutationError = ErrorType<void>
+    export type SubmitClueAppealMutationVariables = {slug: string;data: BodyType<ClueAppealInput>}
+
+    /**
+ * @summary Appeal a blocked clue
+ */
+export const useSubmitClueAppeal = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitClueAppeal>>, TError,SubmitClueAppealMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitClueAppeal>>,
+        TError,
+        SubmitClueAppealMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitClueAppealMutationOptions(options));
+    }
+
+export const getListPendingClueAppealsUrl = () => {
+
+
+
+
+  return `/api/review/appeals`
+}
+
+/**
+ * @summary List pending clue appeals for reviewers
+ */
+export const listPendingClueAppeals = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClueAppealReview[]> => {
+
+  return customFetch<ClueAppealReview[]>(getListPendingClueAppealsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPendingClueAppealsQueryKey = () => {
+    return [
+    `/api/review/appeals`
+    ] as const;
+    }
+
+
+export const getListPendingClueAppealsQueryOptions = <TData = Awaited<ReturnType<typeof listPendingClueAppeals>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPendingClueAppeals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPendingClueAppealsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPendingClueAppeals>>> = ({ signal }) => listPendingClueAppeals({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPendingClueAppeals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPendingClueAppealsQueryResult = NonNullable<Awaited<ReturnType<typeof listPendingClueAppeals>>>
+export type ListPendingClueAppealsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List pending clue appeals for reviewers
+ */
+
+export function useListPendingClueAppeals<TData = Awaited<ReturnType<typeof listPendingClueAppeals>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPendingClueAppeals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPendingClueAppealsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewClueAppealUrl = (appealId: number,) => {
+
+
+
+
+  return `/api/review/appeals/${appealId}/decision`
+}
+
+/**
+ * @summary Restore or retire an appealed clue
+ */
+export const reviewClueAppeal = async (appealId: number,
+    clueAppealDecision: ClueAppealDecision, options?: Parameters<typeof customFetch>[1]): Promise<ClueAppealDecisionResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ClueAppealDecisionResult>(getReviewClueAppealUrl(appealId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clueAppealDecision)
+  }
+);}
+
+
+
+
+
+export const getReviewClueAppealMutationKey = () => ['reviewClueAppeal'] as const;
+
+export const getReviewClueAppealMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewClueAppeal>>, TError,ReviewClueAppealMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewClueAppeal>>, TError,ReviewClueAppealMutationVariables, TContext> => {
+
+const mutationKey = getReviewClueAppealMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewClueAppeal>>, ReviewClueAppealMutationVariables> = (props) => {
+          const {appealId,data} = props ?? {};
+
+          return  reviewClueAppeal(appealId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewClueAppealMutationResult = NonNullable<Awaited<ReturnType<typeof reviewClueAppeal>>>
+    export type ReviewClueAppealMutationBody = BodyType<ClueAppealDecision>
+    export type ReviewClueAppealMutationError = ErrorType<void>
+    export type ReviewClueAppealMutationVariables = {appealId: number;data: BodyType<ClueAppealDecision>}
+
+    /**
+ * @summary Restore or retire an appealed clue
+ */
+export const useReviewClueAppeal = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewClueAppeal>>, TError,ReviewClueAppealMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewClueAppeal>>,
+        TError,
+        ReviewClueAppealMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewClueAppealMutationOptions(options));
     }
 
 export const getRateClueUrl = (slug: string,) => {

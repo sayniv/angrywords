@@ -9,6 +9,18 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * @nullable
+ */
+export type ClueAppealStatus = typeof ClueAppealStatus[keyof typeof ClueAppealStatus] | null;
+
+
+export const ClueAppealStatus = {
+  pending: 'pending',
+  restored: 'restored',
+  retired: 'retired',
+} as const;
+
 export interface Clue {
   id: number;
   slug: string;
@@ -40,6 +52,13 @@ export interface Clue {
   userSolved: boolean | null;
   /** @nullable */
   revealedAnswer: string | null;
+  isBlocked?: boolean;
+  /** @nullable */
+  reportCount?: number | null;
+  /** @nullable */
+  appealStatus?: ClueAppealStatus;
+  /** @nullable */
+  appealReason?: string | null;
 }
 
 export interface ClueSummary {
@@ -195,6 +214,68 @@ export interface ClueReportResult {
   threshold: ClueReportResultThreshold;
   blocked: boolean;
   alreadyReported: boolean;
+}
+
+export interface ClueAppealInput {
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  reason: string;
+}
+
+export type ClueAppealResultStatus = typeof ClueAppealResultStatus[keyof typeof ClueAppealResultStatus];
+
+
+export const ClueAppealResultStatus = {
+  pending: 'pending',
+} as const;
+
+export interface ClueAppealResult {
+  id: number;
+  status: ClueAppealResultStatus;
+  reportCount: number;
+  submittedAt: string;
+}
+
+export interface ClueAppealReview {
+  id: number;
+  slug: string;
+  clue: string;
+  answer: string;
+  /** @nullable */
+  wordplay: string | null;
+  setterName: string;
+  reason: string;
+  reportCount: number;
+  submittedAt: string;
+}
+
+export type ClueAppealDecisionAction = typeof ClueAppealDecisionAction[keyof typeof ClueAppealDecisionAction];
+
+
+export const ClueAppealDecisionAction = {
+  restore: 'restore',
+  retire: 'retire',
+} as const;
+
+export interface ClueAppealDecision {
+  action: ClueAppealDecisionAction;
+}
+
+export type ClueAppealDecisionResultStatus = typeof ClueAppealDecisionResultStatus[keyof typeof ClueAppealDecisionResultStatus];
+
+
+export const ClueAppealDecisionResultStatus = {
+  restored: 'restored',
+  retired: 'retired',
+} as const;
+
+export interface ClueAppealDecisionResult {
+  id: number;
+  status: ClueAppealDecisionResultStatus;
+  slug: string;
+  reviewedAt: string;
 }
 
 export interface SolverLeaderboardEntry {

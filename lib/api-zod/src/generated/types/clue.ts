@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ClueAppealStatus } from './clueAppealStatus';
 
 export interface Clue {
   id: number;
@@ -37,4 +38,11 @@ export interface Clue {
   userSolved: boolean | null;
   /** @nullable */
   revealedAnswer: string | null;
+  isBlocked?: boolean;
+  /** @nullable */
+  reportCount?: number | null;
+  /** @nullable */
+  appealStatus?: ClueAppealStatus;
+  /** @nullable */
+  appealReason?: string | null;
 }

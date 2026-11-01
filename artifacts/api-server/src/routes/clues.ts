@@ -26,11 +26,19 @@ import {
   RateClueResponse,
   ReportClueParams,
   ReportClueResponse,
+  SubmitClueAppealBody,
+  SubmitClueAppealParams,
+  SubmitClueAppealResponse,
+  ListPendingClueAppealsResponse,
+  ReviewClueAppealBody,
+  ReviewClueAppealParams,
+  ReviewClueAppealResponse,
   UpdateMyProfileBody,
   UpdateMyProfileResponse,
 } from "@workspace/api-zod";
 import {
   db,
+  clueAppealsTable,
   clueReportsTable,
   clueRatingsTable,
   cluesTable,
@@ -41,6 +49,12 @@ import { containsObjectionableLanguage } from "../lib/content-moderation";
 
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
+const REVIEWER_USER_IDS = new Set(
+  (process.env.CLUE_REVIEWER_USER_IDS ?? "")
+    .split(",")
+    .map((userId) => userId.trim())
+    .filter(Boolean),
+);
 const requireAuth: RequestHandler = (req, res, next) => {
   if (!getAuth(req).userId) {
     res.status(401).json({ error: "Sign in to continue." });
@@ -51,6 +65,19 @@ const requireAuth: RequestHandler = (req, res, next) => {
 
 function normalizeAnswer(value: string): string {
   return value.toLocaleUpperCase("en").replace(/[^A-Z0-9]/g, "");
+}
+
+function requireReviewer(req: Parameters<RequestHandler>[0], res: Parameters<RequestHandler>[1]): string | null {
+  const userId = getAuth(req).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to continue." });
+    return null;
+  }
+  if (!REVIEWER_USER_IDS.has(userId)) {
+    res.status(403).json({ error: "Reviewer access is required." });
+    return null;
+  }
+  return userId;
 }
 
 function publicProfileResponse(profile: {
@@ -372,16 +399,17 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     res.status(410).json({ error: "This clue has been retired by its setter." });
     return;
   }
-  if (clue.blockedAt) {
+  const userId = getAuth(req).userId;
+  const isOwner = clue.setterUserId === userId;
+  if (clue.blockedAt && !isOwner) {
     res.status(410).json({
       error: "This clue has been blocked after reaching 100 community reports.",
     });
     return;
   }
 
-  const userId = getAuth(req).userId;
   const setterProfile =
-    userId === clue.setterUserId
+    isOwner
       ? await ensureProfile(clue.setterUserId)
       : (await publicProfilesForUsers([clue.setterUserId])).get(clue.setterUserId);
   const [progress] = userId
@@ -432,6 +460,23 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
         )
         .limit(1)
     : [];
+  const [appeal] = isOwner && clue.blockedAt
+    ? await db
+        .select({
+          status: clueAppealsTable.status,
+          reason: clueAppealsTable.reason,
+        })
+        .from(clueAppealsTable)
+        .where(eq(clueAppealsTable.clueId, clue.id))
+        .orderBy(desc(clueAppealsTable.submittedAt))
+        .limit(1)
+    : [];
+  const [reportSummary] = isOwner && clue.blockedAt
+    ? await db
+        .select({ reportCount: count() })
+        .from(clueReportsTable)
+        .where(eq(clueReportsTable.clueId, clue.id))
+    : [];
 
   const response = {
     id: clue.id,
@@ -450,7 +495,7 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     ratingCount: Number(ratingStats?.ratingCount ?? 0),
     userRating: userRatingRow?.rating ?? null,
     userHasReported: Boolean(userReportRow),
-    isOwner: clue.setterUserId === userId,
+    isOwner,
     createdAt: clue.createdAt,
     userAttemptsUsed: progress?.attemptsUsed ?? null,
     userCompleted: progress ? Boolean(progress.solvedAt || progress.failedAt) : null,
@@ -458,9 +503,13 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     userStartedAt: progress?.startedAt ?? null,
     userSolved: progress ? Boolean(progress.solvedAt) : null,
     revealedAnswer:
-      clue.setterUserId === userId || progress?.solvedAt || progress?.failedAt
+      isOwner || progress?.solvedAt || progress?.failedAt
         ? clue.answer
         : null,
+    isBlocked: Boolean(clue.blockedAt),
+    reportCount: reportSummary ? Number(reportSummary.reportCount) : null,
+    appealStatus: appeal?.status ?? null,
+    appealReason: appeal?.reason ?? null,
   };
   res.json(GetClueResponse.parse(response));
 });
@@ -529,6 +578,184 @@ router.post("/clues/:slug/report", requireAuth, async (req, res): Promise<void> 
     return;
   }
   res.json(ReportClueResponse.parse(result));
+});
+
+router.post("/clues/:slug/appeal", requireAuth, async (req, res): Promise<void> => {
+  const params = SubmitClueAppealParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = SubmitClueAppealBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  const result = await db.transaction(async (tx) => {
+    const [clue] = await tx
+      .select({
+        id: cluesTable.id,
+        setterUserId: cluesTable.setterUserId,
+        blockedAt: cluesTable.blockedAt,
+        retiredAt: cluesTable.retiredAt,
+      })
+      .from(cluesTable)
+      .where(eq(cluesTable.slug, params.data.slug))
+      .for("update")
+      .limit(1);
+    if (!clue) return { status: 404 as const, error: "Clue not found." };
+    if (clue.setterUserId !== userId) {
+      return { status: 403 as const, error: "Only the original setter can appeal this clue." };
+    }
+    if (!clue.blockedAt || clue.retiredAt) {
+      return { status: 409 as const, error: "Only a blocked, active clue can be appealed." };
+    }
+
+    const [existingPending] = await tx
+      .select({ id: clueAppealsTable.id })
+      .from(clueAppealsTable)
+      .where(and(eq(clueAppealsTable.clueId, clue.id), eq(clueAppealsTable.status, "pending")))
+      .limit(1);
+    if (existingPending) {
+      return { status: 409 as const, error: "This clue already has a pending appeal." };
+    }
+    const [appeal] = await tx
+      .insert(clueAppealsTable)
+      .values({
+        clueId: clue.id,
+        setterUserId: userId,
+        reason: body.data.reason.trim(),
+      })
+      .returning();
+    const [summary] = await tx
+      .select({ reportCount: count() })
+      .from(clueReportsTable)
+      .where(eq(clueReportsTable.clueId, clue.id));
+    return {
+      status: 201 as const,
+      appeal: {
+        id: appeal.id,
+        status: "pending" as const,
+        reportCount: Number(summary?.reportCount ?? 0),
+        submittedAt: appeal.submittedAt,
+      },
+    };
+  });
+  if (result.status !== 201) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.status(201).json(SubmitClueAppealResponse.parse(result.appeal));
+});
+
+router.get("/review/appeals", async (req, res): Promise<void> => {
+  if (!requireReviewer(req, res)) return;
+  const appeals = await db
+    .select({
+      id: clueAppealsTable.id,
+      clueId: clueAppealsTable.clueId,
+      slug: cluesTable.slug,
+      clue: cluesTable.clue,
+      answer: cluesTable.answer,
+      wordplay: cluesTable.wordplay,
+      setterName: cluesTable.setterName,
+      reason: clueAppealsTable.reason,
+      submittedAt: clueAppealsTable.submittedAt,
+    })
+    .from(clueAppealsTable)
+    .innerJoin(cluesTable, eq(clueAppealsTable.clueId, cluesTable.id))
+    .where(eq(clueAppealsTable.status, "pending"))
+    .orderBy(asc(clueAppealsTable.submittedAt));
+  const clueIds = [...new Set(appeals.map((appeal) => appeal.clueId))];
+  const reportRows = clueIds.length
+    ? await db
+        .select({ clueId: clueReportsTable.clueId, reportCount: count() })
+        .from(clueReportsTable)
+        .where(inArray(clueReportsTable.clueId, clueIds))
+        .groupBy(clueReportsTable.clueId)
+    : [];
+  const reportCounts = new Map(reportRows.map((row) => [row.clueId, Number(row.reportCount)]));
+  const response = appeals.map((appeal) => ({
+    id: appeal.id,
+    slug: appeal.slug,
+    clue: appeal.clue,
+    answer: appeal.answer,
+    wordplay: appeal.wordplay,
+    setterName: appeal.setterName,
+    reason: appeal.reason,
+    reportCount: reportCounts.get(appeal.clueId) ?? 0,
+    submittedAt: appeal.submittedAt,
+  }));
+  res.json(ListPendingClueAppealsResponse.parse(response));
+});
+
+router.post("/review/appeals/:appealId/decision", async (req, res): Promise<void> => {
+  const reviewerUserId = requireReviewer(req, res);
+  if (!reviewerUserId) return;
+  const params = ReviewClueAppealParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const body = ReviewClueAppealBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const result = await db.transaction(async (tx) => {
+    const [appeal] = await tx
+      .select()
+      .from(clueAppealsTable)
+      .where(eq(clueAppealsTable.id, params.data.appealId))
+      .for("update")
+      .limit(1);
+    if (!appeal) return { status: 404 as const, error: "Appeal not found." };
+    if (appeal.status !== "pending") {
+      return { status: 409 as const, error: "This appeal has already been reviewed." };
+    }
+    const [clue] = await tx
+      .select()
+      .from(cluesTable)
+      .where(eq(cluesTable.id, appeal.clueId))
+      .for("update")
+      .limit(1);
+    if (!clue || !clue.blockedAt || clue.retiredAt) {
+      return { status: 409 as const, error: "This clue is no longer available for review." };
+    }
+    const reviewedAt = new Date();
+    if (body.data.action === "restore") {
+      await tx
+        .update(cluesTable)
+        .set({ blockedAt: null })
+        .where(eq(cluesTable.id, clue.id));
+    } else {
+      await tx
+        .update(cluesTable)
+        .set({ retiredAt: reviewedAt })
+        .where(eq(cluesTable.id, clue.id));
+    }
+    const status = body.data.action === "restore" ? "restored" as const : "retired" as const;
+    await tx
+      .update(clueAppealsTable)
+      .set({
+        status,
+        reviewerUserId,
+        reviewerAction: body.data.action,
+        reviewedAt,
+      })
+      .where(eq(clueAppealsTable.id, appeal.id));
+    return {
+      status: 200 as const,
+      decision: { id: appeal.id, status, slug: clue.slug, reviewedAt },
+    };
+  });
+  if (result.status !== 200) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.json(ReviewClueAppealResponse.parse(result.decision));
 });
 
 router.put("/clues/:slug/rating", requireAuth, async (req, res): Promise<void> => {

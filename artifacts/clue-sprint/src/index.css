@@ -560,6 +560,35 @@
 .owner-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .button-danger-outline { color: #a73c30; background: #fff8f4; border: 1px solid #e5b9aa; }
 .button-danger-outline:hover { border-color: #a73c30; background: #fff1eb; }
+.appeal-panel { margin-top: 19px; padding: 20px; background: #fffdf8; border: 1px solid #dfd3c2; border-left: 3px solid var(--tomato); border-radius: 5px; }
+.appeal-panel h2 { margin: 7px 0 5px; color: var(--ink); font: 600 24px var(--app-font-serif); }
+.appeal-panel > p { margin: 0 0 15px; color: #75685e; font-size: 12px; line-height: 1.6; }
+.appeal-form { display: grid; gap: 12px; }
+.appeal-form [data-slot="form-item"] { display: grid; gap: 7px; }
+.appeal-form label { color: var(--ink); font-size: 12px; font-weight: 650; }
+.appeal-form textarea { width: 100%; padding: 11px 12px; color: var(--ink); background: #fffefa; border: 1px solid #d9cebf; border-radius: 5px; resize: vertical; font: 13px/1.6 var(--app-font-sans); }
+.appeal-form textarea:focus { outline: none; border-color: var(--tomato); box-shadow: 0 0 0 3px #c94e3d14; }
+.appeal-form .form-error { margin: 0; }
+.appeal-pending { padding: 13px; color: #365c49; background: #e9ede2; border-radius: 4px; font-size: 12px; }
+.appeal-pending p { margin: 6px 0 0; line-height: 1.6; white-space: pre-wrap; }
+.reviewer-link-wrap { display: flex; justify-content: flex-end; margin-top: 22px; }
+.review-page { padding-top: 40px; }
+.review-page > .back-link { display: inline-flex; margin-bottom: 25px; }
+.review-page .page-title { margin: 8px 0; }
+.review-page-intro { max-width: 620px; margin: 0 0 26px; color: #75685e; line-height: 1.65; }
+.appeal-queue { display: grid; gap: 17px; }
+.appeal-review-card { padding: clamp(18px, 3vw, 28px); background: #fffdf8; border: 1px solid #e1d6c6; border-radius: 6px; }
+.appeal-review-meta { display: flex; flex-wrap: wrap; gap: 8px 17px; padding-bottom: 13px; color: #8c7c6a; border-bottom: 1px solid #eee7da; font: 10px var(--app-font-mono); letter-spacing: .04em; }
+.appeal-review-clue { padding: 17px 0 9px; }
+.appeal-review-clue h2 { margin: 6px 0; color: var(--ink); font: 600 clamp(23px, 4vw, 34px)/1.25 var(--app-font-serif); }
+.appeal-review-details { display: grid; grid-template-columns: 1fr 2fr; gap: 15px; margin: 8px 0 19px; padding: 14px; background: #f7f2e8; border-radius: 4px; }
+.appeal-review-details div { min-width: 0; }
+.appeal-review-details dt { margin-bottom: 5px; color: #8c7c6a; font: 10px var(--app-font-mono); text-transform: uppercase; }
+.appeal-review-details dd { margin: 0; color: var(--ink); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.appeal-review-reason { padding: 15px; border: 1px solid #e6dccd; border-radius: 4px; }
+.appeal-review-reason p { margin: 8px 0 0; color: var(--ink); font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+.appeal-review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.review-page .save-confirmation { margin: 12px 0 19px !important; }
 .clue-editor { margin-top: 18px; }
 .clue-editor .field-label { display: block; margin-bottom: 8px; }
 .edit-attempt-control { margin: 22px 0; padding-top: 18px; border-top: 1px solid #e5dccf; }
@@ -767,6 +796,8 @@
   .dash-section-heading .section-title { font-size: 32px; }
   .dash-note { align-items: flex-start; flex-wrap: wrap; }
   .dash-note a { margin-left: 28px; }
+  .appeal-review-details { grid-template-columns: 1fr; }
+  .appeal-review-actions > .button { flex: 1; justify-content: center; }
   .auth-scene { padding: 23px 16px; }
   .auth-scene > div:first-child { margin-bottom: 22px; }
   .auth-card { padding: 12px; }

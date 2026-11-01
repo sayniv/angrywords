@@ -19,6 +19,7 @@
 
 export * from "./clues";
 export * from "./clue-reports";
+export * from "./clue-appeals";
 export * from "./clue-ratings";
 export * from "./solver-progress";
 export * from "./user-profiles";

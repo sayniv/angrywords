@@ -1,5 +1,8 @@
 import { type ReactNode, type FormEvent, useState, useEffect, useRef } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   ClerkProvider, SignIn, SignUp, useClerk, useUser,
 } from '@clerk/react';
@@ -13,11 +16,16 @@ import {
 import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
   getGetMyProfileQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
+  getListPendingClueAppealsQueryKey,
   getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
+  useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
   type SolverActivity,
 } from '@workspace/api-client-react';
+import {
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+} from '@/components/ui/form';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -133,6 +141,7 @@ function ClerkRoutes() {
           <Route path="/create" component={CreateGate} />
           <Route path="/clue/:slug" component={ChallengePage} />
           <Route path="/dashboard" component={DashboardGate} />
+          <Route path="/review" component={ReviewerGate} />
           <Route component={NotFound} />
         </Switch>
       </ProfileGate>
@@ -579,6 +588,13 @@ function ChallengePage() {
   const retireClue = useRetireClue();
   const rateClue = useRateClue();
   const reportClue = useReportClue();
+  const submitAppeal = useSubmitClueAppeal();
+  const appealForm = useForm<{ reason: string }>({
+    resolver: zodResolver(z.object({
+      reason: z.string().trim().min(10, 'Please explain why the reports are mistaken.').max(1000),
+    })),
+    defaultValues: { reason: '' },
+  });
   const [ratingChoice, setRatingChoice] = useState(0);
   const [ratingError, setRatingError] = useState('');
   const [reportNotice, setReportNotice] = useState('');
@@ -757,6 +773,19 @@ function ChallengePage() {
       setReportError(apiErrorMessage(cause, 'Your report could not be recorded. Please try again.'));
     }
   };
+  const handleAppeal = async ({ reason }: { reason: string }) => {
+    if (!clue?.isOwner) return;
+    try {
+      await submitAppeal.mutateAsync({ slug, data: { reason: reason.trim() } });
+      appealForm.reset({ reason: '' });
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+    } catch (cause) {
+      appealForm.setError('root', { message: apiErrorMessage(cause, 'Your appeal could not be submitted. Please try again.') });
+    }
+  };
   const errorStatus = (error as { status?: number } | null)?.status;
   const blockedError = errorStatus === 410 && apiErrorMessage(error, '').toLowerCase().includes('blocked');
   return <><Header /><main className="page-wrap challenge-page">
@@ -778,7 +807,25 @@ function ChallengePage() {
           {clue.isOwner && clue.wordplay && <div className="owner-note"><Lightbulb size={17} /><div><strong>Your setter's note</strong><p>{clue.wordplay}</p></div></div>}
           {clue.isOwner ? (
             <>
-              <div className="owner-note"><Lightbulb size={17} /><div><strong>Your clue is live</strong><p>The answer is <b>{clue.revealedAnswer}</b>. Published wording is locked. Share the challenge link and see who solves it fastest.</p></div></div>
+              <div className="owner-note"><Lightbulb size={17} /><div><strong>{clue.isBlocked ? 'Your clue is blocked' : 'Your clue is live'}</strong><p>The answer is <b>{clue.revealedAnswer}</b>. Published wording is locked. {clue.isBlocked ? 'Only a reviewer can restore it after considering your appeal.' : 'Share the challenge link and see who solves it fastest.'}</p></div></div>
+              {clue.isBlocked && <section className="appeal-panel" data-testid="panel-clue-appeal">
+                <span className="form-index">COMMUNITY REPORT REVIEW</span>
+                <h2>This clue is blocked.</h2>
+                <p>It received {clue.reportCount ?? 100} distinct reports and is hidden from solving. Your solve and rating history remains intact.</p>
+                {clue.appealStatus === 'pending' ? <div className="appeal-pending" role="status" data-testid="status-appeal-pending"><strong>Your appeal is with a reviewer.</strong><p>{clue.appealReason}</p></div> : <Form {...appealForm}>
+                  <form className="appeal-form" onSubmit={appealForm.handleSubmit(handleAppeal)}>
+                    <FormField control={appealForm.control} name="reason" render={({ field }) => <FormItem>
+                      <FormLabel>Why should this clue be restored?</FormLabel>
+                      <FormControl><textarea {...field} data-testid="input-appeal-reason" rows={4} maxLength={1000} placeholder="Explain why you believe the reports are mistaken or coordinated." /></FormControl>
+                      <FormMessage />
+                    </FormItem>} />
+                    {appealForm.formState.errors.root && <div className="form-error" role="alert" data-testid="status-appeal-error">{appealForm.formState.errors.root.message}</div>}
+                    <button className="button button-primary" type="submit" data-testid="button-submit-appeal" disabled={submitAppeal.isPending}>
+                      {submitAppeal.isPending ? 'Sending appeal…' : 'Request a review'} <ArrowRight size={15} />
+                    </button>
+                  </form>
+                </Form>}
+              </section>}
               <div className="owner-actions">
                 <button className="button button-danger-outline" type="button" disabled={retireClue.isPending} onClick={() => void handleRetire()}><Trash2 size={15} /> {retireClue.isPending ? 'Retiring…' : 'Retire clue'}</button>
               </div>
@@ -833,6 +880,63 @@ function ChallengePage() {
         </aside>
       </div>
     }
+  </main><Footer /></>;
+}
+
+function ReviewerGate() {
+  return <Protected><ReviewerPage /></Protected>;
+}
+
+function ReviewerPage() {
+  const { data: appeals, isLoading, isError, error, refetch } = useListPendingClueAppeals({
+    query: { queryKey: getListPendingClueAppealsQueryKey(), refetchOnMount: 'always' },
+  });
+  const reviewAppeal = useReviewClueAppeal();
+  const cache = useQueryClient();
+  const [actionError, setActionError] = useState('');
+  const [notice, setNotice] = useState('');
+  const decide = async (appealId: number, slug: string, action: 'restore' | 'retire') => {
+    setActionError('');
+    setNotice('');
+    try {
+      const result = await reviewAppeal.mutateAsync({ appealId, data: { action } });
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getListPendingClueAppealsQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+      setNotice(result.status === 'restored' ? 'The clue has been restored.' : 'The clue has been retired.');
+    } catch (cause) {
+      setActionError(apiErrorMessage(cause, 'The review decision could not be saved. Please try again.'));
+    }
+  };
+  const errorStatus = (error as { status?: number } | null)?.status;
+  return <><Header active="dashboard" /><main className="page-wrap dashboard-page review-page">
+    <Link href="/dashboard" className="back-link"><ArrowLeft size={15} /> Your page</Link>
+    <div className="eyebrow"><span className="eyebrow-dot" /> CLUE MODERATION</div>
+    <h1 className="page-title">Appeals to review</h1>
+    <p className="review-page-intro">Check the clue, its report count, and the setter’s explanation. Your decision is recorded.</p>
+    {notice && <div className="save-confirmation" role="status" data-testid="status-review-success"><Check size={15} /> {notice}</div>}
+    {actionError && <div className="form-error" role="alert" data-testid="status-review-error"><X size={16} /> {actionError}</div>}
+    {isLoading ? <div className="state-panel"><h2>Loading appeals…</h2></div> : isError ? <div className="state-panel">
+      <h2>{errorStatus === 403 ? 'Reviewer access required.' : 'The review queue is unavailable.'}</h2>
+      <p>{errorStatus === 403 ? 'This account is not configured to review clue appeals.' : apiErrorMessage(error, 'Please try again.')}</p>
+      {errorStatus !== 403 && <button className="button button-outline" onClick={() => void refetch()}>Try again <RotateCcw size={15} /></button>}
+    </div> : appeals?.length ? <div className="appeal-queue" data-testid="list-pending-appeals">
+      {appeals.map((appeal) => <article className="appeal-review-card" key={appeal.id} data-testid={`card-appeal-${appeal.id}`}>
+        <div className="appeal-review-meta"><span>SET BY {appeal.setterName}</span><span>{appeal.reportCount} reports</span><span>{new Date(appeal.submittedAt).toLocaleDateString()}</span></div>
+        <div className="appeal-review-clue"><span className="form-index">CLUE</span><h2>{appeal.clue}</h2></div>
+        <dl className="appeal-review-details"><div><dt>Answer</dt><dd>{appeal.answer}</dd></div><div><dt>Wordplay note</dt><dd>{appeal.wordplay || 'No wordplay note provided.'}</dd></div></dl>
+        <div className="appeal-review-reason"><span className="form-index">SETTER’S APPEAL</span><p>{appeal.reason}</p></div>
+        <div className="appeal-review-actions">
+          <button className="button button-primary" type="button" data-testid={`button-restore-appeal-${appeal.id}`} disabled={reviewAppeal.isPending} onClick={() => void decide(appeal.id, appeal.slug, 'restore')}>Restore clue <Check size={15} /></button>
+          <button className="button button-danger-outline" type="button" data-testid={`button-retire-appeal-${appeal.id}`} disabled={reviewAppeal.isPending} onClick={() => {
+            if (window.confirm('Retire this clue? Its solve and rating history will be preserved.')) void decide(appeal.id, appeal.slug, 'retire');
+          }}>Retire clue <Trash2 size={15} /></button>
+        </div>
+      </article>)}
+    </div> : <div className="state-panel" data-testid="empty-review-queue"><h2>No pending appeals.</h2><p>New setter appeals will appear here.</p></div>}
   </main><Footer /></>;
 }
 
@@ -895,6 +999,7 @@ function DashboardPage() {
       <div className="dash-section-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR RECENT CLUES</div><h2 className="section-title">The ones you put out there</h2></div><Link href="/" className="text-link">Browse the whole board <ArrowRight size={15} /></Link></div>
       {dashboard.recentClues.length ? <div className="clue-grid dashboard-grid">{dashboard.recentClues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}</div> : <div className="empty-clues dash-empty"><div className="empty-stamp"><Feather size={27} /></div><div><h3>Your setter's notebook is blank.</h3><p>Write a clue, then see who can crack it.</p></div><Link href="/create" className="button button-primary">Write your first clue <ArrowRight size={15} /></Link></div>}
       <div className="dash-note"><span><Sparkles size={17} /></span><p>Every new clue starts its own race. Share the link and let the solving begin.</p><Link href="/create">Make another <ArrowUpRight size={15} /></Link></div>
+      <div className="reviewer-link-wrap"><Link href="/review" className="text-link" data-testid="link-review-appeals">Open the reviewer queue <ArrowRight size={15} /></Link></div>
     </>}
   </main><Footer /></>;
 }

@@ -82,7 +82,11 @@ export const CreateClueResponse = zod.object({
   "userElapsedSeconds": zod.number().int().nullable(),
   "userStartedAt": zod.coerce.date().nullable(),
   "userSolved": zod.boolean().nullable(),
-  "revealedAnswer": zod.string().nullable()
+  "revealedAnswer": zod.string().nullable(),
+  "isBlocked": zod.boolean().optional(),
+  "reportCount": zod.number().int().nullish(),
+  "appealStatus": zod.union([zod.literal('pending'),zod.literal('restored'),zod.literal('retired'),zod.literal(null)]).nullish(),
+  "appealReason": zod.string().nullish()
 })
 
 
@@ -113,7 +117,11 @@ export const GetClueResponse = zod.object({
   "userElapsedSeconds": zod.number().int().nullable(),
   "userStartedAt": zod.coerce.date().nullable(),
   "userSolved": zod.boolean().nullable(),
-  "revealedAnswer": zod.string().nullable()
+  "revealedAnswer": zod.string().nullable(),
+  "isBlocked": zod.boolean().optional(),
+  "reportCount": zod.number().int().nullish(),
+  "appealStatus": zod.union([zod.literal('pending'),zod.literal('restored'),zod.literal('retired'),zod.literal(null)]).nullish(),
+  "appealReason": zod.string().nullish()
 })
 
 
@@ -139,6 +147,66 @@ export const ReportClueResponse = zod.object({
   "threshold": zod.literal(100),
   "blocked": zod.boolean(),
   "alreadyReported": zod.boolean()
+})
+
+
+/**
+ * @summary Appeal a blocked clue
+ */
+export const SubmitClueAppealParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const submitClueAppealBodyReasonMin = 10;
+export const submitClueAppealBodyReasonMax = 1000;
+
+
+
+export const SubmitClueAppealBody = zod.object({
+  "reason": zod.string().min(submitClueAppealBodyReasonMin).max(submitClueAppealBodyReasonMax)
+})
+
+export const SubmitClueAppealResponse = zod.object({
+  "id": zod.number().int(),
+  "status": zod.enum(['pending']),
+  "reportCount": zod.number().int(),
+  "submittedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List pending clue appeals for reviewers
+ */
+export const ListPendingClueAppealsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "slug": zod.string(),
+  "clue": zod.string(),
+  "answer": zod.string(),
+  "wordplay": zod.string().nullable(),
+  "setterName": zod.string(),
+  "reason": zod.string(),
+  "reportCount": zod.number().int(),
+  "submittedAt": zod.coerce.date()
+})
+export const ListPendingClueAppealsResponse = zod.array(ListPendingClueAppealsResponseItem)
+
+
+/**
+ * @summary Restore or retire an appealed clue
+ */
+export const ReviewClueAppealParams = zod.object({
+  "appealId": zod.coerce.number().int()
+})
+
+export const ReviewClueAppealBody = zod.object({
+  "action": zod.enum(['restore', 'retire'])
+})
+
+export const ReviewClueAppealResponse = zod.object({
+  "id": zod.number().int(),
+  "status": zod.enum(['restored', 'retired']),
+  "slug": zod.string(),
+  "reviewedAt": zod.coerce.date()
 })
 
 
