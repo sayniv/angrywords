@@ -102,11 +102,51 @@ describe('signed-in header sign-out confirmation', () => {
 });
 
 describe('sign-out dialog narrow layout', () => {
+  beforeEach(() => {
+    auth.signedIn = true;
+    auth.signOut.mockReset();
+  });
+
   it('stacks full-width actions at a narrow viewport breakpoint', () => {
     const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
     const narrowRules = css.match(/@media \(max-width: 600px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
 
     expect(narrowRules).toContain('.sign-out-dialog-actions { flex-direction: column-reverse; }');
     expect(narrowRules).toContain('.sign-out-dialog-actions > button { width: 100%; }');
+  });
+
+  it('keeps both sign-out choices reachable on short phone screens', async () => {
+    const originalInnerWidth = window.innerWidth;
+    const originalInnerHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 320 });
+
+    try {
+      const user = userEvent.setup();
+      renderHeader();
+      await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+      const dialog = screen.getByRole('alertdialog', { name: 'Sign out of Clue Sprint?' });
+      const cancel = screen.getByRole('button', { name: 'Cancel' });
+      const confirm = screen.getByRole('button', { name: 'Sign out' });
+      const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
+      const dialogRules = css.match(/\.sign-out-dialog \{([^}]*)\}/)?.[1] ?? '';
+
+      expect(window.innerWidth).toBe(390);
+      expect(window.innerHeight).toBe(320);
+      expect(dialog).toBeTruthy();
+      expect(dialogRules).toContain('max-height: calc(100vh - 2rem);');
+      expect(dialogRules).toContain('max-height: calc(100dvh - 2rem);');
+      expect(dialogRules).toContain('overflow-y: auto;');
+      expect(document.activeElement).toBe(cancel);
+
+      await user.tab();
+      expect(document.activeElement).toBe(confirm);
+      await user.tab({ shift: true });
+      expect(document.activeElement).toBe(cancel);
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight });
+    }
   });
 });
