@@ -13,4 +13,5 @@ export interface Dashboard {
   solved: number;
   recentClues: ClueSummary[];
   recentActivity: SolverActivity[];
+  hasMoreActivity: boolean;
 }

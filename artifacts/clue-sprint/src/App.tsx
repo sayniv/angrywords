@@ -1,5 +1,5 @@
 import { type ReactNode, type FormEvent, useState, useEffect, useRef } from 'react';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,7 +14,7 @@ import {
   Star, Trash2, Trophy, X,
 } from 'lucide-react';
 import {
-  getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
+  getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey, getMyActivity,
   getGetMyProfileQueryKey, getGetCluePublishQuotaQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
   getListPendingClueAppealsQueryKey,
   getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard, useGetCluePublishQuota,
@@ -980,7 +980,19 @@ function useParamsSafe() { return useParams<{ slug: string }>(); }
 function DashboardPage() {
   const { data: dashboard, isLoading, isError, refetch } = useGetMyDashboard();
   const { data: profile } = useGetMyProfile();
+  const { user } = useUser();
   const cache = useQueryClient();
+  const olderActivity = useInfiniteQuery({
+    queryKey: ['/api/me/activity', user?.id],
+    initialPageParam: 10,
+    queryFn: ({ pageParam, signal }) => getMyActivity({ offset: pageParam }, { signal }),
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    enabled: false,
+  });
+  const allActivity = [
+    ...(dashboard?.recentActivity ?? []),
+    ...(olderActivity.data?.pages.flatMap((page) => page.activities) ?? []),
+  ];
   const updateProfile = useUpdateMyProfile();
   const [blurb, setBlurb] = useState('');
   const [blurbError, setBlurbError] = useState('');
@@ -1085,9 +1097,21 @@ function DashboardPage() {
         <Link href="/" className="text-link">Find another clue <ArrowRight size={15} /></Link>
       </div>
       {dashboard.recentActivity.length ? <div className="activity-grid" data-testid="list-solver-activity">
-        {dashboard.recentActivity.map((activity) => <ActivityCard key={activity.id} activity={activity} />)}
+        {allActivity.map((activity) => <ActivityCard key={activity.id} activity={activity} />)}
       </div> : <div className="activity-empty" data-testid="empty-solver-activity">
         <Feather size={19} /><span>No clues started yet. Browse the board and find one to solve.</span><Link href="/" className="text-link">Browse clues <ArrowRight size={15} /></Link>
+      </div>}
+      {dashboard.hasMoreActivity && (!olderActivity.data || olderActivity.hasNextPage) && <div className="activity-load-more">
+        {olderActivity.isFetchNextPageError && <span className="activity-load-error" role="alert">Older activity could not be loaded. Try again.</span>}
+        <button
+          className="button button-outline"
+          type="button"
+          data-testid="button-load-older-activity"
+          disabled={olderActivity.isFetchingNextPage}
+          onClick={() => void olderActivity.fetchNextPage()}
+        >
+          {olderActivity.isFetchingNextPage ? 'Loading older activity…' : olderActivity.isFetchNextPageError ? 'Try again' : 'Load older activity'} <ArrowDownRight size={15} />
+        </button>
       </div>}
       <div className="dash-section-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR RECENT CLUES</div><h2 className="section-title">The ones you put out there</h2></div><Link href="/" className="text-link">Browse the whole board <ArrowRight size={15} /></Link></div>
       {dashboard.recentClues.length ? <div className="clue-grid dashboard-grid">{dashboard.recentClues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}</div> : <div className="empty-clues dash-empty"><div className="empty-stamp"><Feather size={27} /></div><div><h3>Your setter's notebook is blank.</h3><p>Write a clue, then see who can crack it.</p></div><Link href="/create" className="button button-primary">Write your first clue <ArrowRight size={15} /></Link></div>}

@@ -690,6 +690,8 @@
 .activity-empty { display: flex; align-items: center; gap: 11px; margin-bottom: 58px; padding: 20px; color: #827566; background: #f8f3e9; border: 1px dashed #d9cebe; font-size: 12px; }
 .activity-empty > svg { flex: 0 0 auto; color: var(--tomato); }
 .activity-empty .text-link { margin-left: auto; }
+.activity-load-more { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin: -36px 0 58px; }
+.activity-load-error { color: #a43e34; font-size: 12px; }
 .dash-empty { margin-bottom: 18px; }
 .dash-note { display: flex; align-items: center; gap: 11px; margin-top: 27px; padding: 17px; color: #827566; background: #f1ecdf; border: 1px solid #e4d9c9; border-radius: 6px; font-size: 11px; }
 .dash-note > span { color: var(--tomato); }

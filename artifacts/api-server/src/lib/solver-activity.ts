@@ -25,3 +25,30 @@ export function getSolverActivityState(progress: {
       ? ("failed" as const)
       : ("in-progress" as const);
 }
+
+export function serializeSolverActivity(
+  clue: Pick<
+    typeof cluesTable.$inferSelect,
+    "id" | "slug" | "clue" | "answer" | "maxAttempts" | "setterName"
+  >,
+  progress: Pick<
+    typeof solverProgressTable.$inferSelect,
+    "attemptsUsed" | "solvedAt" | "failedAt" | "elapsedSeconds" | "startedAt"
+  >,
+) {
+  return {
+    id: clue.id,
+    slug: clue.slug,
+    clue: clue.clue,
+    answerLength: clue.answer.toLocaleUpperCase("en").replace(/[^A-Z0-9]/g, "").length,
+    maxAttempts: clue.maxAttempts,
+    setterName: clue.setterName,
+    attemptsUsed: progress.attemptsUsed,
+    attemptsRemaining: Math.max(0, clue.maxAttempts - progress.attemptsUsed),
+    state: getSolverActivityState(progress),
+    elapsedSeconds: progress.solvedAt || progress.failedAt
+      ? progress.elapsedSeconds ?? 0
+      : Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000)),
+    startedAt: progress.startedAt,
+  };
+}

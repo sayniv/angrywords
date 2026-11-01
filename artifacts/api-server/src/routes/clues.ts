@@ -37,6 +37,8 @@ import {
   ReviewClueAppealResponse,
   UpdateMyProfileBody,
   UpdateMyProfileResponse,
+  GetMyActivityQueryParams,
+  GetMyActivityResponse,
 } from "@workspace/api-zod";
 import {
   db,
@@ -64,12 +66,13 @@ import {
 } from "../lib/clue-progress";
 import {
   getDashboardActivityScope,
-  getSolverActivityState,
   getSolverProgressScope,
+  serializeSolverActivity,
 } from "../lib/solver-activity";
 
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
+const SOLVER_ACTIVITY_PAGE_SIZE = 10;
 const REVIEWER_USER_IDS = new Set(
   (process.env.CLUE_REVIEWER_USER_IDS ?? "")
     .split(",")
@@ -1546,6 +1549,35 @@ router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {
   }
 });
 
+router.get("/me/activity", requireAuth, async (req, res): Promise<void> => {
+  const params = GetMyActivityQueryParams.safeParse(req.query);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  const offset = params.data.offset ?? 0;
+  const activityRows = await db
+    .select({ clue: cluesTable, progress: solverProgressTable })
+    .from(solverProgressTable)
+    .innerJoin(cluesTable, eq(solverProgressTable.clueId, cluesTable.id))
+    .where(getDashboardActivityScope(userId))
+    .orderBy(desc(solverProgressTable.startedAt), desc(solverProgressTable.id))
+    .limit(SOLVER_ACTIVITY_PAGE_SIZE + 1)
+    .offset(offset);
+  const hasMore = activityRows.length > SOLVER_ACTIVITY_PAGE_SIZE;
+  const activities = activityRows
+    .slice(0, SOLVER_ACTIVITY_PAGE_SIZE)
+    .map(({ clue, progress }) => serializeSolverActivity(clue, progress));
+  res.json(
+    GetMyActivityResponse.parse({
+      activities,
+      nextOffset: hasMore ? offset + SOLVER_ACTIVITY_PAGE_SIZE : null,
+    }),
+  );
+});
+
 router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
   const userId = getAuth(req).userId!;
   const profile = await ensureProfile(userId);
@@ -1589,29 +1621,19 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
     .from(solverProgressTable)
     .innerJoin(cluesTable, eq(solverProgressTable.clueId, cluesTable.id))
     .where(getDashboardActivityScope(userId))
-    .orderBy(desc(solverProgressTable.startedAt))
-    .limit(10);
-  const recentActivity = activityRows.map(({ clue, progress }) => ({
-    id: clue.id,
-    slug: clue.slug,
-    clue: clue.clue,
-    answerLength: normalizeAnswer(clue.answer).length,
-    maxAttempts: clue.maxAttempts,
-    setterName: clue.setterName,
-    attemptsUsed: progress.attemptsUsed,
-    attemptsRemaining: Math.max(0, clue.maxAttempts - progress.attemptsUsed),
-    state: getSolverActivityState(progress),
-    elapsedSeconds: progress.solvedAt || progress.failedAt
-      ? progress.elapsedSeconds ?? 0
-      : Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000)),
-    startedAt: progress.startedAt,
-  }));
+    .orderBy(desc(solverProgressTable.startedAt), desc(solverProgressTable.id))
+    .limit(SOLVER_ACTIVITY_PAGE_SIZE + 1);
+  const hasMoreActivity = activityRows.length > SOLVER_ACTIVITY_PAGE_SIZE;
+  const recentActivity = activityRows
+    .slice(0, SOLVER_ACTIVITY_PAGE_SIZE)
+    .map(({ clue, progress }) => serializeSolverActivity(clue, progress));
   res.json(
     GetMyDashboardResponse.parse({
       created: Number(createdRow.total),
       solved: Number(solvedRow.total),
       recentClues,
       recentActivity,
+      hasMoreActivity,
     }),
   );
 });

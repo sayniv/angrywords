@@ -12,6 +12,7 @@ import {
   getDashboardActivityScope,
   getSolverActivityState,
   getSolverProgressScope,
+  serializeSolverActivity,
 } from "../src/lib/solver-activity.ts";
 
 const postgresDialect = new PgDialect();
@@ -97,6 +98,42 @@ test("dashboard activity distinguishes in-progress, solved, and failed runs", ()
     }),
     "failed",
   );
+});
+
+test("activity serialization preserves older-run attempt counts and result state", () => {
+  const clue = {
+    id: 84,
+    slug: "older-clue",
+    clue: "A historic puzzle",
+    answer: "OLD ANSWER",
+    maxAttempts: 6,
+    setterName: "Setter",
+  };
+  const startedAt = new Date("2026-10-15T12:00:00.000Z");
+  const solvedActivity = serializeSolverActivity(clue, {
+    attemptsUsed: 4,
+    solvedAt: new Date("2026-10-15T12:02:00.000Z"),
+    failedAt: null,
+    elapsedSeconds: 120,
+    startedAt,
+  });
+  assert.equal(solvedActivity.attemptsUsed, 4);
+  assert.equal(solvedActivity.attemptsRemaining, 2);
+  assert.equal(solvedActivity.state, "solved");
+  assert.equal(solvedActivity.elapsedSeconds, 120);
+  assert.equal(solvedActivity.startedAt, startedAt);
+
+  const failedActivity = serializeSolverActivity(clue, {
+    attemptsUsed: 6,
+    solvedAt: null,
+    failedAt: new Date("2026-10-15T12:05:00.000Z"),
+    elapsedSeconds: 300,
+    startedAt,
+  });
+  assert.equal(failedActivity.attemptsUsed, 6);
+  assert.equal(failedActivity.attemptsRemaining, 0);
+  assert.equal(failedActivity.state, "failed");
+  assert.equal(failedActivity.elapsedSeconds, 300);
 });
 
 test("a reloaded clue restores saved attempts and its in-progress result", () => {

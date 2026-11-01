@@ -177,6 +177,13 @@ export interface Dashboard {
   solved: number;
   recentClues: ClueSummary[];
   recentActivity: SolverActivity[];
+  hasMoreActivity: boolean;
+}
+
+export interface SolverActivityPage {
+  activities: SolverActivity[];
+  /** @nullable */
+  nextOffset: number | null;
 }
 
 export interface PublicProfile {
@@ -324,4 +331,12 @@ export const ListCluesSort = {
   newest: 'newest',
   rating: 'rating',
 } as const;
+
+export type GetMyActivityParams = {
+/**
+ * @minimum 0
+ * @maximum 1000000
+ */
+offset?: number;
+};
 

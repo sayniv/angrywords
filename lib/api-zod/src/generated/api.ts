@@ -374,7 +374,39 @@ export const GetMyDashboardResponse = zod.object({
   "state": zod.enum(['in-progress', 'solved', 'failed']),
   "elapsedSeconds": zod.number().int(),
   "startedAt": zod.coerce.date()
-}))
+})),
+  "hasMoreActivity": zod.boolean()
+})
+
+
+/**
+ * @summary Get a page of the current user's solve activity
+ */
+export const getMyActivityQueryOffsetDefault = 0;
+export const getMyActivityQueryOffsetMin = 0;
+export const getMyActivityQueryOffsetMax = 1000000;
+
+
+
+export const GetMyActivityQueryParams = zod.object({
+  "offset": zod.coerce.number().int().min(getMyActivityQueryOffsetMin).max(getMyActivityQueryOffsetMax).default(getMyActivityQueryOffsetDefault)
+})
+
+export const GetMyActivityResponse = zod.object({
+  "activities": zod.array(zod.object({
+  "id": zod.number().int(),
+  "slug": zod.string(),
+  "clue": zod.string(),
+  "answerLength": zod.number().int(),
+  "maxAttempts": zod.number().int(),
+  "setterName": zod.string(),
+  "attemptsUsed": zod.number().int(),
+  "attemptsRemaining": zod.number().int(),
+  "state": zod.enum(['in-progress', 'solved', 'failed']),
+  "elapsedSeconds": zod.number().int(),
+  "startedAt": zod.coerce.date()
+})),
+  "nextOffset": zod.number().int().nullable()
 })
 
 

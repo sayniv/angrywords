@@ -467,6 +467,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /me/activity:
+    get:
+      operationId: getMyActivity
+      tags: [profile]
+      summary: Get a page of the current user's solve activity
+      security:
+        - clerkSession: []
+      parameters:
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000000
+            default: 0
+      responses:
+        "200":
+          description: A page of personal solve activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SolverActivityPage"
+        "401":
+          description: Sign in to view solve activity
   /me/profile:
     get:
       operationId: getMyProfile
@@ -650,7 +675,7 @@ components:
         solvedAt: { type: string, format: date-time }
     Dashboard:
       type: object
-      required: [created, solved, recentClues, recentActivity]
+      required: [created, solved, recentClues, recentActivity, hasMoreActivity]
       properties:
         created: { type: integer }
         solved: { type: integer }
@@ -662,6 +687,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SolverActivity"
+        hasMoreActivity: { type: boolean }
     SolverActivity:
       type: object
       required: [id, slug, clue, answerLength, maxAttempts, setterName, attemptsUsed, attemptsRemaining, state, elapsedSeconds, startedAt]
@@ -679,6 +705,15 @@ components:
           enum: [in-progress, solved, failed]
         elapsedSeconds: { type: integer }
         startedAt: { type: string, format: date-time }
+    SolverActivityPage:
+      type: object
+      required: [activities, nextOffset]
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/SolverActivity"
+        nextOffset: { type: ["integer", "null"] }
     PublicProfile:
       type: object
       required: [publicId, claimedPublicIds, isGuest, needsSetup, blurb]

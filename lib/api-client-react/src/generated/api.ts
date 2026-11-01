@@ -39,12 +39,14 @@ import type {
   ClueStartResult,
   ClueSummary,
   Dashboard,
+  GetMyActivityParams,
   HealthStatus,
   LeaderboardEntry,
   ListCluesParams,
   ProfileInput,
   PublicProfile,
   SetterLeaderboardEntry,
+  SolverActivityPage,
   SolverLeaderboardEntry
 } from './api.schemas';
 
@@ -1504,6 +1506,90 @@ export function useGetMyDashboard<TData = Awaited<ReturnType<typeof getMyDashboa
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetMyDashboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMyActivityUrl = (params?: GetMyActivityParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/me/activity?${stringifiedParams}` : `/api/me/activity`
+}
+
+/**
+ * @summary Get a page of the current user's solve activity
+ */
+export const getMyActivity = async (params?: GetMyActivityParams, options?: Parameters<typeof customFetch>[1]): Promise<SolverActivityPage> => {
+
+  return customFetch<SolverActivityPage>(getGetMyActivityUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyActivityQueryKey = (params?: GetMyActivityParams,) => {
+    return [
+    `/api/me/activity`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMyActivityQueryOptions = <TData = Awaited<ReturnType<typeof getMyActivity>>, TError = ErrorType<void>>(params?: GetMyActivityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyActivityQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyActivity>>> = ({ signal }) => getMyActivity(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getMyActivity>>>
+export type GetMyActivityQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a page of the current user's solve activity
+ */
+
+export function useGetMyActivity<TData = Awaited<ReturnType<typeof getMyActivity>>, TError = ErrorType<void>>(
+ params?: GetMyActivityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyActivityQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
