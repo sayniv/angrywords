@@ -332,7 +332,7 @@ function TutorialRoute() {
   return <><Header active="tutorial" /><TutorialPage /><Footer /></>;
 }
 
-function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' | 'tutorial' }) {
+export function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' | 'tutorial' }) {
   const { isSignedIn } = useUser();
   const { data: profile } = useGetMyProfile({
     query: { queryKey: getGetMyProfileQueryKey(), enabled: Boolean(isSignedIn) },
