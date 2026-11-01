@@ -621,14 +621,20 @@ function CreatePage() {
 function ChallengePage() {
   const params = useParamsSafe();
   const slug = params.slug || '';
-  const { data: clue, isLoading, isError, error, refetch } = useGetClue(slug);
+  const { isLoaded: authLoaded, isSignedIn, user } = useUser();
+  const clueQueryKey = [
+    ...getGetClueQueryKey(slug),
+    authLoaded && isSignedIn ? user?.id ?? 'signed-in' : 'signed-out',
+  ];
+  const { data: clue, isLoading, isError, error, refetch } = useGetClue(slug, {
+    query: { queryKey: clueQueryKey, enabled: authLoaded },
+  });
   const { data: leaderboard, isLoading: leaderboardLoading, isError: leaderboardError, refetch: refetchLeaderboard } =
     useGetClueLeaderboard(slug, { query: { queryKey: getGetClueLeaderboardQueryKey(slug), staleTime: 15_000, refetchOnMount: 'always' } });
   const submitAttempt = useSubmitAttempt();
   const giveUpClue = useGiveUpClue();
   const startClue = useStartClue();
   const cache = useQueryClient();
-  const { isLoaded: authLoaded, isSignedIn } = useUser();
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<import('@workspace/api-client-react').AttemptResult | null>(null);
   const [copied, setCopied] = useState(false);

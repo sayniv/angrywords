@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import {
+  getClueSolution,
   getClueProgressState,
   getCompletedAttemptResult,
   hasSuccessfulSolve,
@@ -14,6 +15,46 @@ import {
 } from "../src/lib/solver-activity.ts";
 
 const postgresDialect = new PgDialect();
+const solution = {
+  answer: "SUNSET",
+  wordplay: "Sun + set makes sunset.",
+};
+
+test("signed-out visitors and solvers with active runs do not receive the solution", () => {
+  assert.deepEqual(getClueSolution(undefined, false, solution), {
+    revealedAnswer: null,
+    wordplay: null,
+  });
+  assert.deepEqual(
+    getClueSolution(
+      { solvedAt: null, failedAt: null },
+      false,
+      solution,
+    ),
+    {
+      revealedAnswer: null,
+      wordplay: null,
+    },
+  );
+});
+
+test("the solution is returned only for a completed solve or failure", () => {
+  const solvedAt = new Date("2026-11-01T12:00:00.000Z");
+  const failedAt = new Date("2026-11-01T12:00:00.000Z");
+  const revealed = {
+    revealedAnswer: solution.answer,
+    wordplay: solution.wordplay,
+  };
+
+  assert.deepEqual(
+    getClueSolution({ solvedAt, failedAt: null }, false, solution),
+    revealed,
+  );
+  assert.deepEqual(
+    getClueSolution({ solvedAt: null, failedAt }, false, solution),
+    revealed,
+  );
+});
 
 test("dashboard activity and clue progress queries are scoped to the signed-in solver", () => {
   const dashboardScope = postgresDialect.sqlToQuery(

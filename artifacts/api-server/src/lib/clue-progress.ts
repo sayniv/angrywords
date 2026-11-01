@@ -5,6 +5,25 @@ type SolverProgress = {
   elapsedSeconds: number | null;
 };
 
+function shouldRevealClueSolution(
+  progress: Pick<SolverProgress, "solvedAt" | "failedAt"> | undefined,
+  isOwner: boolean,
+) {
+  return isOwner || Boolean(progress?.solvedAt || progress?.failedAt);
+}
+
+export function getClueSolution(
+  progress: Pick<SolverProgress, "solvedAt" | "failedAt"> | undefined,
+  isOwner: boolean,
+  solution: { answer: string; wordplay: string | null },
+) {
+  const revealSolution = shouldRevealClueSolution(progress, isOwner);
+  return {
+    revealedAnswer: revealSolution ? solution.answer : null,
+    wordplay: revealSolution ? solution.wordplay : null,
+  };
+}
+
 export function getClueProgressState(
   progress: SolverProgress | undefined,
   isOwner: boolean,
@@ -14,8 +33,7 @@ export function getClueProgressState(
       ? Boolean(progress.solvedAt || progress.failedAt)
       : null,
     userSolved: progress ? Boolean(progress.solvedAt) : null,
-    revealSolution:
-      isOwner || Boolean(progress?.solvedAt || progress?.failedAt),
+    revealSolution: shouldRevealClueSolution(progress, isOwner),
   };
 }
 

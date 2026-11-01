@@ -60,6 +60,7 @@ import {
   getClueProgressState,
   getCompletedAttemptResult,
   hasSuccessfulSolve,
+  getClueSolution,
 } from "../lib/clue-progress";
 import {
   getDashboardActivityScope,
@@ -603,7 +604,10 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     slug: clue.slug,
     clue: clue.clue,
     answerLength: normalizeAnswer(clue.answer).length,
-    wordplay: progressState.revealSolution ? clue.wordplay : null,
+    ...getClueSolution(progress, isOwner, {
+      answer: clue.answer,
+      wordplay: clue.wordplay,
+    }),
     maxAttempts: clue.maxAttempts,
     setterName: setterProfile?.publicId ?? clue.setterName,
     setterBlurb: setterProfile?.blurb ?? null,
@@ -619,7 +623,6 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     userElapsedSeconds: currentElapsed,
     userStartedAt: progress?.startedAt ?? null,
     userSolved: progressState.userSolved,
-    revealedAnswer: progressState.revealSolution ? clue.answer : null,
     isBlocked: Boolean(clue.blockedAt),
     reportCount: reportSummary ? Number(reportSummary.reportCount) : null,
     appealStatus: appeal?.status ?? null,
