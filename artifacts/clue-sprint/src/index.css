@@ -680,11 +680,14 @@
 .board-heading h2 { margin: 7px 0 0; color: var(--ink); font: 600 25px var(--app-font-serif); letter-spacing: -.04em; }
 .board-heading .eyebrow { font-size: 9px; }
 .board-subtitle { margin: 8px 0 18px; color: #817366; font-size: 11px; }
-.clue-board-category { margin-top: 20px; padding-top: 17px; border-top: 1px solid #dbd0bf; }
+.clue-board-category { margin-top: 14px; padding: 14px 14px 8px; border: 1px solid #dbd0bf; border-radius: 6px; }
 .clue-board-category h3 { margin: 0 0 10px; color: var(--ink); font: 600 18px var(--app-font-serif); letter-spacing: -.025em; }
 .clue-board-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .clue-board-title h3 { margin: 0; }
 .clue-board-title > span { color: #82766a; font: 9px/1.4 var(--app-font-mono); text-align: right; }
+.clue-board-gold { background: #fbf3d8; border-color: #e6d28e; }
+.clue-board-silver { background: #edf0f2; border-color: #cbd4da; }
+.clue-board-bronze { background: #f3e5da; border-color: #dfbfa9; }
 .clue-board-gold .clue-board-title h3 { color: #765711; }
 .clue-board-silver .clue-board-title h3 { color: #536170; }
 .clue-board-bronze .clue-board-title h3 { color: #8f4e2c; }

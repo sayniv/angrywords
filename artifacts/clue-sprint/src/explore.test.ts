@@ -698,9 +698,10 @@ describe('Race So Far medal tiers', () => {
     expect(screen.queryByTestId('text-own-solve-gold')).toBeNull();
   });
 
-  it('defines distinct heading and rank accent colors for all three tiers', () => {
+  it('defines distinct section, heading, and rank colors for all three tiers', () => {
     const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
     for (const tier of ['gold', 'silver', 'bronze']) {
+      expect(css).toMatch(new RegExp(`\\.clue-board-${tier} \\{ background: #[0-9a-f]{6}; border-color: #[0-9a-f]{6}; \\}`));
       expect(css).toContain(`.clue-board-${tier} .clue-board-title h3`);
       expect(css).toContain(`.clue-board-${tier} .tier-rank-badge`);
     }
