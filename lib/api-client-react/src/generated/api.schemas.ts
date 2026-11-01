@@ -119,10 +119,34 @@ export interface LeaderboardEntry {
   solvedAt: string;
 }
 
+export type SolverActivityState = typeof SolverActivityState[keyof typeof SolverActivityState];
+
+
+export const SolverActivityState = {
+  'in-progress': 'in-progress',
+  solved: 'solved',
+  failed: 'failed',
+} as const;
+
+export interface SolverActivity {
+  id: number;
+  slug: string;
+  clue: string;
+  answerLength: number;
+  maxAttempts: number;
+  setterName: string;
+  attemptsUsed: number;
+  attemptsRemaining: number;
+  state: SolverActivityState;
+  elapsedSeconds: number;
+  startedAt: string;
+}
+
 export interface Dashboard {
   created: number;
   solved: number;
   recentClues: ClueSummary[];
+  recentActivity: SolverActivity[];
 }
 
 export interface PublicProfile {

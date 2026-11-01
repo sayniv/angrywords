@@ -1029,11 +1029,43 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
     isBlocked: Boolean(clue.blockedAt),
     createdAt: clue.createdAt,
   }));
+  const activityRows = await db
+    .select({ clue: cluesTable, progress: solverProgressTable })
+    .from(solverProgressTable)
+    .innerJoin(cluesTable, eq(solverProgressTable.clueId, cluesTable.id))
+    .where(
+      and(
+        eq(solverProgressTable.userId, userId),
+        isNull(cluesTable.retiredAt),
+      ),
+    )
+    .orderBy(desc(solverProgressTable.startedAt))
+    .limit(10);
+  const recentActivity = activityRows.map(({ clue, progress }) => ({
+    id: clue.id,
+    slug: clue.slug,
+    clue: clue.clue,
+    answerLength: normalizeAnswer(clue.answer).length,
+    maxAttempts: clue.maxAttempts,
+    setterName: clue.setterName,
+    attemptsUsed: progress.attemptsUsed,
+    attemptsRemaining: Math.max(0, clue.maxAttempts - progress.attemptsUsed),
+    state: progress.solvedAt
+      ? "solved" as const
+      : progress.failedAt
+        ? "failed" as const
+        : "in-progress" as const,
+    elapsedSeconds: progress.solvedAt || progress.failedAt
+      ? progress.elapsedSeconds ?? 0
+      : Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000)),
+    startedAt: progress.startedAt,
+  }));
   res.json(
     GetMyDashboardResponse.parse({
       created: Number(createdRow.total),
       solved: Number(solvedRow.total),
       recentClues,
+      recentActivity,
     }),
   );
 });

@@ -6,9 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ClueSummary } from './clueSummary';
+import type { SolverActivity } from './solverActivity';
 
 export interface Dashboard {
   created: number;
   solved: number;
   recentClues: ClueSummary[];
+  recentActivity: SolverActivity[];
 }

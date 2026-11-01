@@ -265,6 +265,19 @@ export const GetMyDashboardResponse = zod.object({
   "ratingCount": zod.number().int(),
   "isBlocked": zod.boolean(),
   "createdAt": zod.coerce.date()
+})),
+  "recentActivity": zod.array(zod.object({
+  "id": zod.number().int(),
+  "slug": zod.string(),
+  "clue": zod.string(),
+  "answerLength": zod.number().int(),
+  "maxAttempts": zod.number().int(),
+  "setterName": zod.string(),
+  "attemptsUsed": zod.number().int(),
+  "attemptsRemaining": zod.number().int(),
+  "state": zod.enum(['in-progress', 'solved', 'failed']),
+  "elapsedSeconds": zod.number().int(),
+  "startedAt": zod.coerce.date()
 }))
 })
 

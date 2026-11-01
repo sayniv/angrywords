@@ -466,7 +466,7 @@ components:
         solvedAt: { type: string, format: date-time }
     Dashboard:
       type: object
-      required: [created, solved, recentClues]
+      required: [created, solved, recentClues, recentActivity]
       properties:
         created: { type: integer }
         solved: { type: integer }
@@ -474,6 +474,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ClueSummary"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/SolverActivity"
+    SolverActivity:
+      type: object
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, attemptsUsed, attemptsRemaining, state, elapsedSeconds, startedAt]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        clue: { type: string }
+        answerLength: { type: integer }
+        maxAttempts: { type: integer }
+        setterName: { type: string }
+        attemptsUsed: { type: integer }
+        attemptsRemaining: { type: integer }
+        state:
+          type: string
+          enum: [in-progress, solved, failed]
+        elapsedSeconds: { type: integer }
+        startedAt: { type: string, format: date-time }
     PublicProfile:
       type: object
       required: [publicId, isGuest, needsSetup, blurb]

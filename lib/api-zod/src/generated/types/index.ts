@@ -25,4 +25,6 @@ export * from './listCluesSort';
 export * from './profileInput';
 export * from './publicProfile';
 export * from './setterLeaderboardEntry';
+export * from './solverActivity';
+export * from './solverActivityState';
 export * from './solverLeaderboardEntry';

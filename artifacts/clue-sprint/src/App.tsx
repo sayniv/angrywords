@@ -16,6 +16,7 @@ import {
   getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard,
   useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
+  type SolverActivity,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -827,6 +828,15 @@ function DashboardPage() {
         <div className="stat-block stat-highlight"><span className="stat-label">CLUES SOLVED</span><strong data-testid="text-solved-count">{dashboard.solved}</strong><span className="stat-caption">answers found out there</span></div>
         <div className="stat-aside"><span className="stat-doodle"><Sparkles size={24} /></span><p>Keep the clues coming.<br />Your friends are warming up.</p></div>
       </div>
+      <div className="dash-section-heading activity-section-heading">
+        <div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR SOLVING NOTEBOOK</div><h2 className="section-title">Pick up where you left off</h2></div>
+        <Link href="/" className="text-link">Find another clue <ArrowRight size={15} /></Link>
+      </div>
+      {dashboard.recentActivity.length ? <div className="activity-grid" data-testid="list-solver-activity">
+        {dashboard.recentActivity.map((activity) => <ActivityCard key={activity.id} activity={activity} />)}
+      </div> : <div className="activity-empty" data-testid="empty-solver-activity">
+        <Feather size={19} /><span>No clues started yet. Browse the board and find one to solve.</span><Link href="/" className="text-link">Browse clues <ArrowRight size={15} /></Link>
+      </div>}
       <div className="dash-section-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR RECENT CLUES</div><h2 className="section-title">The ones you put out there</h2></div><Link href="/" className="text-link">Browse the whole board <ArrowRight size={15} /></Link></div>
       {dashboard.recentClues.length ? <div className="clue-grid dashboard-grid">{dashboard.recentClues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}</div> : <div className="empty-clues dash-empty"><div className="empty-stamp"><Feather size={27} /></div><div><h3>Your setter's notebook is blank.</h3><p>Write a clue, then see who can crack it.</p></div><Link href="/create" className="button button-primary">Write your first clue <ArrowRight size={15} /></Link></div>}
       <div className="dash-note"><span><Sparkles size={17} /></span><p>Every new clue starts its own race. Share the link and let the solving begin.</p><Link href="/create">Make another <ArrowUpRight size={15} /></Link></div>
@@ -858,6 +868,22 @@ function hasHttpStatus(cause: unknown, status: number) {
     'status' in cause &&
     (cause as { status?: unknown }).status === status,
   );
+}
+
+function ActivityCard({ activity }: { activity: SolverActivity }) {
+  const stateLabel = activity.state === 'solved' ? 'Solved' : activity.state === 'failed' ? 'Out of guesses' : 'In progress';
+  return <Link href={`/clue/${activity.slug}`} className="activity-card" data-testid={`link-solver-activity-${activity.id}`}>
+    <div className="activity-card-top">
+      <span className={`activity-state activity-state-${activity.state}`}>{stateLabel}</span>
+      <ArrowUpRight size={17} aria-hidden="true" />
+    </div>
+    <h3>{activity.clue}</h3>
+    <p className="activity-setter">Set by {activity.setterName}</p>
+    <div className="activity-card-bottom">
+      <span>{activity.attemptsUsed} of {activity.maxAttempts} {activity.maxAttempts === 1 ? 'guess' : 'guesses'}</span>
+      <span>{formatTime(activity.elapsedSeconds)}</span>
+    </div>
+  </Link>;
 }
 
 function Footer() {
