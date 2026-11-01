@@ -21,6 +21,7 @@ import {
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { trackEvent } from '@/lib/analytics';
 import NotFound from '@/pages/not-found';
 import {
   Link, Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter,
@@ -205,6 +206,9 @@ function ProfileSetupPage({ profile }: { profile: { publicId: string; isGuest: b
     setError('');
     try {
       await updateProfile.mutateAsync({ data: nextId ? { publicId: nextId.trim() } : {} });
+      trackEvent('account_completed', {
+        profile_setup: nextId ? 'custom_public_id' : 'generated_public_id',
+      });
       await cache.invalidateQueries();
     } catch (cause) {
       const status = (cause as { status?: number }).status;
@@ -494,6 +498,11 @@ function CreatePage() {
         clue: clue.trim(), answer: normalizedAnswer.toUpperCase(),
         wordplay: wordplay.trim(), maxAttempts,
       } });
+      trackEvent('clue_published', {
+        max_attempts: maxAttempts,
+        clue_length_chars: clue.trim().length,
+        answer_length: normalizedAnswer.length,
+      });
       await Promise.all([
         cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
         cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
@@ -650,6 +659,14 @@ function ChallengePage() {
         slug,
         data: { answer: answer.trim() },
       });
+      if (next.correct) {
+        trackEvent('successful_solve', {
+          attempts_used: next.attemptsUsed,
+          elapsed_seconds: next.elapsedSeconds,
+          max_attempts: clue.maxAttempts,
+          answer_length: clue.answerLength,
+        });
+      }
       setResult(next);
       setAnswer('');
       await Promise.all([
