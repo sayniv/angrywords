@@ -72,6 +72,12 @@ paths:
                 $ref: "#/components/schemas/Clue"
         "409":
           description: Complete public ID setup before publishing
+        "429":
+          description: Daily published-clue limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CluePublishLimitError"
   /clues/{slug}:
     get:
       operationId: getClue
@@ -576,6 +582,11 @@ components:
         wordplay: { type: string, minLength: 1, maxLength: 1000 }
         maxAttempts: { type: integer, minimum: 1, maximum: 10 }
     ClueRetired:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    CluePublishLimitError:
       type: object
       required: [error]
       properties:

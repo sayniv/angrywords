@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { and, asc, avg, count, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, avg, count, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import {
   AttemptResult,
   CreateClueBody,
@@ -49,6 +49,10 @@ import {
   type UserProfile,
 } from "@workspace/db";
 import { containsObjectionableLanguage } from "../lib/content-moderation";
+import {
+  getSetterPublishLockSql,
+  publishClueWithinDailyLimit,
+} from "../lib/daily-clue-publishing";
 import {
   getClueProgressState,
   getCompletedAttemptResult,
@@ -349,19 +353,59 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [clue] = await db
-    .insert(cluesTable)
-    .values({
-      slug: randomBytes(6).toString("hex"),
-      clue: parsed.data.clue.trim(),
-      answer: parsed.data.answer.trim(),
-      normalizedAnswer: answer,
-      wordplay: parsed.data.wordplay?.trim() || null,
-      maxAttempts: parsed.data.maxAttempts,
-      setterUserId: auth.userId!,
-      setterName: profile.publicId,
-    })
-    .returning();
+  type ClueTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+  const publishResult = await publishClueWithinDailyLimit<
+    ClueTransaction,
+    (typeof cluesTable)["$inferSelect"]
+  >(
+    {
+      withSetterLock: (setterUserId, operation) =>
+        db.transaction(async (tx) => {
+          await tx.execute(getSetterPublishLockSql(setterUserId));
+          return operation(tx);
+        }),
+      countPublished: async (tx, setterUserId, start, end) => {
+        const [result] = await tx
+          .select({ total: count() })
+          .from(cluesTable)
+          .where(
+            and(
+              eq(cluesTable.setterUserId, setterUserId),
+              gte(cluesTable.createdAt, start),
+              lt(cluesTable.createdAt, end),
+            ),
+          );
+        return Number(result.total);
+      },
+    },
+    auth.userId!,
+    async (tx, createdAt) => {
+      const [created] = await tx
+        .insert(cluesTable)
+        .values({
+          slug: randomBytes(6).toString("hex"),
+          clue: parsed.data.clue.trim(),
+          answer: parsed.data.answer.trim(),
+          normalizedAnswer: answer,
+          wordplay: parsed.data.wordplay?.trim() || null,
+          maxAttempts: parsed.data.maxAttempts,
+          setterUserId: auth.userId!,
+          setterName: profile.publicId,
+          createdAt,
+        })
+        .returning();
+      return created;
+    },
+  );
+
+  if (!publishResult.allowed) {
+    res.status(429).json({
+      error:
+        "You’ve reached your limit of 10 published clues today. You can publish again after 00:00 UTC.",
+    });
+    return;
+  }
+  const clue = publishResult.created;
 
   const response = {
     id: clue.id,

@@ -30,6 +30,7 @@ import type {
   ClueAppealResult,
   ClueAppealReview,
   ClueInput,
+  CluePublishLimitError,
   ClueRatingInput,
   ClueRatingSummary,
   ClueReportResult,
@@ -277,7 +278,7 @@ return customFetch<Clue>(getCreateClueUrl(),
 
 export const getCreateClueMutationKey = () => ['createClue'] as const;
 
-export const getCreateClueMutationOptions = <TError = ErrorType<void>,
+export const getCreateClueMutationOptions = <TError = ErrorType<void | CluePublishLimitError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClue>>, TError,CreateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createClue>>, TError,CreateClueMutationVariables, TContext> => {
 
@@ -306,13 +307,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateClueMutationResult = NonNullable<Awaited<ReturnType<typeof createClue>>>
     export type CreateClueMutationBody = BodyType<ClueInput>
-    export type CreateClueMutationError = ErrorType<void>
+    export type CreateClueMutationError = ErrorType<void | CluePublishLimitError>
     export type CreateClueMutationVariables = {data: BodyType<ClueInput>}
 
     /**
  * @summary Create a clue challenge
  */
-export const useCreateClue = <TError = ErrorType<void>,
+export const useCreateClue = <TError = ErrorType<void | CluePublishLimitError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClue>>, TError,CreateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createClue>>,

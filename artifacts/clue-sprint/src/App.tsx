@@ -563,7 +563,7 @@ function CreatePage() {
         <p className="form-footnote">You will see the full clue before it goes live.</p>
       </form> : <section className="paper-form publish-review" data-testid="panel-publish-review">
         <div className="form-heading"><span className="form-index">FINAL CHECK / BEFORE THE SPRINT</span><h2>Read it once as a solver.</h2></div>
-        <p className="review-intro">Here is exactly what will be published. Make sure the clue and explanation are ready.</p>
+        <p className="review-intro">Here is exactly what will be published. You can publish up to 10 clues per UTC day; the limit resets at 00:00 UTC.</p>
         <dl className="review-details">
           <div><dt>Cryptic clue</dt><dd data-testid="review-clue">{clue.trim()}</dd></div>
           <div><dt>Answer</dt><dd data-testid="review-answer">{normalizedAnswer.toUpperCase()}</dd></div>

@@ -105,6 +105,10 @@ export interface ClueRetired {
   error: string;
 }
 
+export interface CluePublishLimitError {
+  error: string;
+}
+
 export interface AttemptInput {
   /**
      * @minLength 1
