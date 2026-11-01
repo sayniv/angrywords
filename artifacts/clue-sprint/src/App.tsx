@@ -7,15 +7,15 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import {
   ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Check, Clock3, Copy,
-  Crown, Feather, Lightbulb, LockKeyhole, Menu, PenLine, RotateCcw, Save, Sparkles,
-  Trash2, Trophy, X,
+  Crown, Feather, Lightbulb, LockKeyhole, Menu, PenLine, RotateCcw, Sparkles,
+  Star, Trash2, Trophy, X,
 } from 'lucide-react';
 import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
-  getGetMyProfileQueryKey, getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
-  useGetMyDashboard, useGetMyProfile, useListClues, useRetireClue, useStartClue,
-  useSubmitAttempt, useUpdateClue, useUpdateMyProfile,
-  type Clue as ClueDto,
+  getGetMyProfileQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
+  getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
+  useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard,
+  useListClues, useRateClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -158,9 +158,9 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
 }
 
 function HomeRedirect() {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded } = useUser();
   if (!isLoaded) return <PageSkeleton />;
-  return isSignedIn ? <Redirect to="/dashboard" /> : <HomePage />;
+  return <HomePage />;
 }
 
 function Protected({ children }: { children: ReactNode }) {
@@ -343,7 +343,12 @@ function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' }) {
 }
 
 function HomePage() {
-  const { data: clues, isLoading, isError, refetch } = useListClues();
+  const [sort, setSort] = useState<'newest' | 'rating'>('newest');
+  const { data: clues, isLoading, isError, refetch } = useListClues({ sort }, {
+    query: { queryKey: getListCluesQueryKey({ sort }), staleTime: 15_000 },
+  });
+  const solvers = useGetSolverLeaderboard({ query: { queryKey: getGetSolverLeaderboardQueryKey() } });
+  const setters = useGetSetterLeaderboard({ query: { queryKey: getGetSetterLeaderboardQueryKey() } });
   return (
     <div className="min-h-[100dvh]">
       <Header />
@@ -379,7 +384,9 @@ function HomePage() {
           <div className="page-wrap">
             <div className="section-topline">
               <div><div className="eyebrow"><span className="eyebrow-dot" /> OPEN FOR SOLVING</div><h2 className="section-title">Fresh from the setters</h2></div>
-              <p className="section-aside">A clue is a tiny mystery.<br />Pick one and have a go.</p>
+              <div className="clue-tools"><p className="section-aside">A clue is a tiny mystery.<br />Pick one and have a go.</p>
+                <label className="sort-control">SORT BY <select data-testid="select-clue-sort" value={sort} onChange={(event) => setSort(event.target.value as 'newest' | 'rating')}><option value="newest">Newest</option><option value="rating">Top rated</option></select></label>
+              </div>
             </div>
             {isLoading ? <ClueSkeletons /> : isError ? (
               <div className="state-panel"><h3>Clues are taking a breather.</h3><p>Give it another try in a moment.</p><button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button></div>
@@ -394,6 +401,15 @@ function HomePage() {
               </div>
             )}
             <div className="bottom-invite"><span className="invite-star"><Sparkles size={18} /></span><p>Have a clue rattling around in your head?</p><Link href="/sign-up">Bring it to the table <ArrowRight size={15} /></Link></div>
+          </div>
+        </section>
+        <section className="public-leaderboards">
+          <div className="page-wrap">
+            <div className="section-topline"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE FRIENDLY RIVALRY</div><h2 className="section-title">Good minds, good clues.</h2></div><p className="section-aside">Two ways to earn a little glory.</p></div>
+            <div className="public-board-grid">
+              <PublicLeaderboard title="Quickest solvers" note="Average time on successful solves" mode="solver" data={solvers.data} loading={solvers.isLoading} failed={solvers.isError} retry={() => void solvers.refetch()} />
+              <PublicLeaderboard title="Beloved setters" note="Average star rating from solvers" mode="setter" data={setters.data} loading={setters.isLoading} failed={setters.isError} retry={() => void setters.refetch()} />
+            </div>
           </div>
         </section>
         <section className="how-section">
@@ -412,15 +428,35 @@ function HomePage() {
   );
 }
 
-function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: string; answerLength: number; maxAttempts: number; setterName: string; solveCount: number }; index: number }) {
+function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: string; answerLength: number; maxAttempts: number; setterName: string; setterBlurb?: string | null; solveCount: number; averageRating?: number | null; ratingCount?: number }; index: number }) {
   return (
     <Link href={`/clue/${clue.slug}`} className={`clue-card reveal-up clue-card-${index % 3}`} data-testid={`card-clue-${clue.id}`}>
       <div className="card-meta"><span className="clue-number">CLUE NO. {String(clue.id).padStart(3, '0')}</span><span className="card-arrow"><ArrowUpRight size={17} /></span></div>
       <p className="card-clue-text">{clue.clue}</p>
       <div className="answer-slots">{Array.from({ length: Math.min(clue.answerLength, 12) }, (_, i) => <i key={i} />)}<span>{clue.answerLength} letters</span></div>
+      {clue.setterBlurb && <p className="setter-blurb-card" data-testid={`text-setter-blurb-${clue.id}`}>{clue.setterBlurb}</p>}
       <div className="card-footer"><span>by <strong>{clue.setterName}</strong></span><span className="solve-count"><Trophy size={14} /> {clue.solveCount} solved</span></div>
+      <div className="card-rating" data-testid={`text-clue-rating-${clue.id}`}><Star size={13} fill="currentColor" /> {clue.averageRating == null ? 'Not rated yet' : `${clue.averageRating.toFixed(1)} · ${clue.ratingCount ?? 0} ratings`}</div>
     </Link>
   );
+}
+
+function PublicLeaderboard({ title, note, mode, data, loading, failed, retry }: {
+  title: string; note: string; mode: 'solver' | 'setter';
+  data?: Array<{ rank: number; displayName: string; averageSeconds?: number; solvedCount?: number; averageRating?: number; ratingCount?: number }>;
+  loading: boolean; failed: boolean; retry: () => void;
+}) {
+  return <section className="public-board" data-testid={`leaderboard-${mode}`}>
+    <div className="board-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> {mode === 'solver' ? 'SOLVERS' : 'SETTERS'}</div><h3>{title}</h3></div><Trophy size={21} /></div>
+    <p className="board-subtitle">{note}</p>
+    {loading ? <LeaderboardSkeleton /> : failed ? <div className="board-empty"><p>Could not load the rankings.</p><button className="text-button" onClick={retry}>Try again</button></div> : data?.length ? <ol className="leaderboard">
+      {data.slice(0, 5).map((entry) => <li className={`leader-row ${entry.rank === 1 ? 'leader-first' : ''}`} key={`${mode}-${entry.rank}-${entry.displayName}`} data-testid={`row-${mode}-leader-${entry.rank}`}>
+        <span className={`rank-badge rank-${entry.rank}`}>{entry.rank === 1 ? <Crown size={15} /> : String(entry.rank).padStart(2, '0')}</span>
+        <div className="leader-person"><strong>{entry.displayName}</strong><span>{mode === 'solver' ? `${entry.solvedCount ?? 0} solved` : `${entry.ratingCount ?? 0} ratings`}</span></div>
+        <span className="leader-time">{mode === 'solver' ? formatTime(Math.round(entry.averageSeconds ?? 0)) : <span className="rating-inline"><Star size={13} fill="currentColor" /> {(entry.averageRating ?? 0).toFixed(1)}</span>}</span>
+      </li>)}
+    </ol> : <div className="board-empty"><div className="empty-medal"><Trophy size={20} /></div><strong>The board is waiting.</strong><p>Be among the first to make your mark.</p></div>}
+  </section>;
 }
 
 function Step({ number, icon, title, text }: { number: string; icon: ReactNode; title: string; text: string }) {
@@ -436,13 +472,21 @@ function CreatePage() {
   const [wordplay, setWordplay] = useState('');
   const [maxAttempts, setMaxAttempts] = useState(5);
   const [error, setError] = useState('');
+  const [review, setReview] = useState(false);
   const normalizedAnswer = answer.trim().replace(/[^a-z0-9]/gi, '');
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const validateDraft = () => {
     setError('');
-    if (clue.trim().length < 4) { setError('A clue needs at least four characters.'); return; }
-    if (!normalizedAnswer) { setError('Add the answer so the sprint can check guesses.'); return; }
-    if (!wordplay.trim()) { setError('Add a short explanation so solvers can enjoy the reveal.'); return; }
+    if (clue.trim().length < 4) { setError('A clue needs at least four characters.'); return false; }
+    if (!normalizedAnswer) { setError('Add the answer so the sprint can check guesses.'); return false; }
+    if (!wordplay.trim()) { setError('Add a short explanation so solvers can enjoy the reveal.'); return false; }
+    return true;
+  };
+  const submitDraft = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (validateDraft()) setReview(true);
+  };
+  const publish = async () => {
+    setError('');
     try {
       const created = await createClue.mutateAsync({ data: {
         clue: clue.trim(), answer: normalizedAnswer.toUpperCase(),
@@ -453,8 +497,8 @@ function CreatePage() {
         cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
       ]);
       setLocation(`/clue/${created.slug}`);
-    } catch {
-      setError('That clue did not make it through. Check your connection and try again.');
+    } catch (cause) {
+      setError(apiErrorMessage(cause, 'That clue could not be published. Please check it and try again.'));
     }
   };
   return <><Header /><main className="page-wrap page-content">
@@ -463,7 +507,7 @@ function CreatePage() {
       <div className="form-intro"><div className="eyebrow"><span className="eyebrow-dot" /> SETTER'S DESK</div><h1 className="page-title">Make them<br /><em>think twice.</em></h1><p>Write the clue your friends will be turning over in their heads all afternoon.</p>
         <div className="setter-note"><Lightbulb size={17} /><p><strong>A setter's secret</strong><br />A fair clue has a definition and a bit of wordplay. Keep your explanation close; the big reveal comes after the solve.</p></div>
       </div>
-      <form className="paper-form" onSubmit={submit}>
+      {!review ? <form className="paper-form" onSubmit={submitDraft}>
         <div className="form-heading"><span className="form-index">01 / THE CLUE</span><h2>What will they solve?</h2></div>
         <label className="field-label" htmlFor="clue-text">Your cryptic clue</label>
         <textarea id="clue-text" data-testid="input-clue" value={clue} onChange={(e) => setClue(e.target.value)} placeholder="Example: Bird in a muddle, perhaps (5)" maxLength={240} required rows={3} />
@@ -480,11 +524,28 @@ function CreatePage() {
         <div className="form-divider" />
         <div className="attempt-control"><div><span className="form-index">03 / GIVE THEM A FEW SHOTS</span><h2>Maximum attempts</h2><p>How many guesses before the answer is revealed?</p></div><div className="attempt-stepper"><button type="button" aria-label="Fewer attempts" onClick={() => setMaxAttempts(Math.max(1, maxAttempts - 1))}><span>−</span></button><strong data-testid="text-max-attempts">{maxAttempts}</strong><button type="button" aria-label="More attempts" onClick={() => setMaxAttempts(Math.min(10, maxAttempts + 1))}><span>+</span></button></div></div>
         {error && <div className="form-error" role="alert"><X size={16} />{error}</div>}
-        <button className="button button-primary publish-button" type="submit" data-testid="button-publish" disabled={createClue.isPending}>
-          {createClue.isPending ? 'Setting your clue…' : 'Publish the clue'} {createClue.isPending ? <span className="button-dots">···</span> : <ArrowRight size={17} />}
+        <button className="button button-primary publish-button" type="submit" data-testid="button-review-clue">
+          Review your clue <ArrowRight size={17} />
         </button>
-        <p className="form-footnote">Your friends can solve it as soon as it's published.</p>
-      </form>
+        <p className="form-footnote">You will see the full clue before it goes live.</p>
+      </form> : <section className="paper-form publish-review" data-testid="panel-publish-review">
+        <div className="form-heading"><span className="form-index">FINAL CHECK / BEFORE THE SPRINT</span><h2>Read it once as a solver.</h2></div>
+        <p className="review-intro">Here is exactly what will be published. Make sure the clue and explanation are ready.</p>
+        <dl className="review-details">
+          <div><dt>Cryptic clue</dt><dd data-testid="review-clue">{clue.trim()}</dd></div>
+          <div><dt>Answer</dt><dd data-testid="review-answer">{normalizedAnswer.toUpperCase()}</dd></div>
+          <div><dt>Setter's wordplay note</dt><dd data-testid="review-wordplay">{wordplay.trim()}</dd></div>
+          <div><dt>Attempt limit</dt><dd data-testid="review-attempt-limit">{maxAttempts} {maxAttempts === 1 ? 'guess' : 'guesses'}</dd></div>
+        </dl>
+        <div className="publish-warning" role="note"><LockKeyhole size={17} /><p><strong>Published clues cannot be edited.</strong><br />You can retire a clue later, but its wording and answer will stay as published.</p></div>
+        {error && <div className="form-error" role="alert" data-testid="status-publish-error"><X size={16} />{error}</div>}
+        <div className="review-actions">
+          <button className="button button-outline" type="button" data-testid="button-back-to-edit" onClick={() => { setError(''); setReview(false); }}><ArrowLeft size={15} /> Back to edit</button>
+          <button className="button button-primary" type="button" data-testid="button-publish" disabled={createClue.isPending} onClick={() => void publish()}>
+            {createClue.isPending ? 'Publishing…' : 'Publish for good'} {createClue.isPending ? <span className="button-dots">···</span> : <ArrowRight size={17} />}
+          </button>
+        </div>
+      </section>}
     </div>
   </main><Footer /></>;
 }
@@ -502,15 +563,19 @@ function ChallengePage() {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<import('@workspace/api-client-react').AttemptResult | null>(null);
   const [copied, setCopied] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [retiredLocally, setRetiredLocally] = useState(false);
   const retireClue = useRetireClue();
+  const rateClue = useRateClue();
+  const [ratingChoice, setRatingChoice] = useState(0);
+  const [ratingError, setRatingError] = useState('');
   const [localElapsed, setLocalElapsed] = useState(0);
   const startRequested = useRef(false);
   useEffect(() => {
     setResult(null);
     setAnswer('');
     setCopied(false);
+    setRatingChoice(0);
+    setRatingError('');
     startRequested.current = false;
   }, [slug]);
   useEffect(() => {
@@ -582,8 +647,23 @@ function ChallengePage() {
         cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }),
         cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
       ]);
-    } catch {
-      setResult({ correct: false, attemptsUsed: result?.attemptsUsed || 0, attemptsRemaining: result?.attemptsRemaining ?? clue.maxAttempts, completed: false, elapsedSeconds: 0, message: 'Your guess could not be sent. Please try again.' });
+    } catch (cause) {
+      setResult({ correct: false, attemptsUsed: result?.attemptsUsed || 0, attemptsRemaining: result?.attemptsRemaining ?? clue.maxAttempts, completed: false, elapsedSeconds: 0, message: apiErrorMessage(cause, 'Your guess could not be sent. Please try again.') });
+    }
+  };
+  const submitRating = async (rating: number) => {
+    setRatingError('');
+    setRatingChoice(rating);
+    try {
+      await rateClue.mutateAsync({ slug, data: { rating } });
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetSetterLeaderboardQueryKey() }),
+      ]);
+    } catch (cause) {
+      setRatingChoice(0);
+      setRatingError(apiErrorMessage(cause, 'Your rating could not be saved. Please try again.'));
     }
   };
   return <><Header /><main className="page-wrap challenge-page">
@@ -592,22 +672,21 @@ function ChallengePage() {
       isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>{(error as { status?: number } | null)?.status === 410 ? 'This clue has been retired.' : 'This clue has slipped away.'}</h2><p>{(error as { status?: number } | null)?.status === 410 ? 'The setter retired this challenge. Its old shared link is no longer active.' : 'It may have been moved, or the link may be mistyped.'}</p>{(error as { status?: number } | null)?.status === 410 ? <Link href="/" className="button button-outline">Browse current clues <ArrowRight size={15} /></Link> : <button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button>}</div> :
       <div className="challenge-layout">
         <section className="challenge-main">
-          <div className="challenge-overline"><span className="eyebrow-dot" /> A CLUE FROM {clue.setterName.toUpperCase()}<span className="challenge-date">{new Date(clue.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><button className="share-link-button" onClick={copyChallengeLink} type="button"><Copy size={13} /> {copied ? 'Link copied' : 'Copy challenge link'}</button></div>
+          <div className="challenge-overline"><span className="eyebrow-dot" /> A CLUE FROM {clue.setterName.toUpperCase()}<span className="challenge-date">{new Date(clue.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><button className="share-link-button" data-testid="button-copy-clue-link" onClick={copyChallengeLink} type="button"><Copy size={13} /> {copied ? 'Link copied' : 'Copy challenge link'}</button></div>
           <div className="challenge-paper">
             <div className="challenge-paper-top"><span>THE DAILY TICKLE</span><span>NO. {String(clue.id).padStart(3, '0')}</span></div>
             <h1 className="challenge-clue" data-testid="text-challenge-clue">{clue.clue}</h1>
             <div className="answer-slots challenge-slots">{Array.from({ length: Math.min(clue.answerLength, 14) }, (_, i) => <i key={i} />)}<span>{clue.answerLength} letters</span></div>
             <div className="challenge-paper-bottom"><span>SET BY <strong>{clue.setterName}</strong></span><span>CRYPTIC / {clue.answerLength}</span></div>
           </div>
+          {clue.setterBlurb && <div className="setter-blurb-detail" data-testid="text-setter-blurb-detail"><span className="form-index">A NOTE FROM THE SETTER</span><p>{clue.setterBlurb}</p></div>}
           {clue.isOwner && clue.wordplay && <div className="owner-note"><Lightbulb size={17} /><div><strong>Your setter's note</strong><p>{clue.wordplay}</p></div></div>}
           {clue.isOwner ? (
             <>
-              <div className="owner-note"><Lightbulb size={17} /><div><strong>Your clue is live</strong><p>The answer is <b>{clue.revealedAnswer}</b>. Edits keep existing attempts and solve records. Share the challenge link and see who solves it fastest.</p></div></div>
+              <div className="owner-note"><Lightbulb size={17} /><div><strong>Your clue is live</strong><p>The answer is <b>{clue.revealedAnswer}</b>. Published wording is locked. Share the challenge link and see who solves it fastest.</p></div></div>
               <div className="owner-actions">
-                <button className="button button-outline" type="button" onClick={() => setEditing((current) => !current)}><PenLine size={15} /> {editing ? 'Close editor' : 'Edit clue'}</button>
                 <button className="button button-danger-outline" type="button" disabled={retireClue.isPending} onClick={() => void handleRetire()}><Trash2 size={15} /> {retireClue.isPending ? 'Retiring…' : 'Retire clue'}</button>
               </div>
-              {editing && <ClueEditor slug={slug} clue={clue} onSaved={() => setEditing(false)} />}
             </>
           ) : !isSignedIn ? (
             <div className="guess-panel"><div className="guess-top"><div><span className="form-index">READY WHEN YOU ARE</span><h2>Join the race</h2></div><div className="timer-chip"><Clock3 size={14} /> {formatTime(0)}</div></div><p className="board-subtitle">Sign in to start your timer and save your attempts across devices.</p><Link href={`/sign-in?next=${encodeURIComponent(window.location.pathname)}`} className="button button-primary">Sign in to solve <ArrowRight size={16} /></Link></div>
@@ -620,6 +699,14 @@ function ChallengePage() {
               <p>{visibleResult.message || (visibleResult.correct ? `Solved in ${formatTime(visibleResult.elapsedSeconds)}.` : 'The clue got the better of this round. There is always the next one.')}</p>
               <div className="solved-word">{clue.revealedAnswer || 'SPRINT COMPLETE'} <span>{visibleResult.attemptsUsed} {visibleResult.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
               {clue.wordplay && <div className="reveal-note"><Lightbulb size={16} /><div><strong>Setter's explanation</strong><p>{clue.wordplay}</p></div></div>}
+              {visibleResult.correct && <div className="rating-panel" data-testid="panel-clue-rating">
+                <span className="form-index">A QUICK THANKS TO THE SETTER</span><h3>How was this clue?</h3>
+                {clue.userRating ? <p className="rating-saved" data-testid="text-rating-saved">Your rating: {clue.userRating} out of 5 stars</p> : <p>Rate the little mystery you just solved.</p>}
+                <div className="rating-stars" role="group" aria-label="Rate clue from one to five stars">
+                  {[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} data-testid={`button-rate-${value}`} aria-label={`Rate ${value} out of 5 stars`} aria-pressed={ratingChoice === value || clue.userRating === value} disabled={rateClue.isPending} onClick={() => void submitRating(value)}><Star size={24} fill={(ratingChoice || clue.userRating || 0) >= value ? 'currentColor' : 'none'} /></button>)}
+                </div>
+                {ratingError && <div className="form-error" role="alert" data-testid="status-rating-error">{ratingError}</div>}
+              </div>}
             </div>
           ) : (
             <form className="guess-panel" onSubmit={handleSubmit}>
@@ -648,77 +735,48 @@ function ChallengePage() {
   </main><Footer /></>;
 }
 
-function ClueEditor({
-  slug,
-  clue,
-  onSaved,
-}: {
-  slug: string;
-  clue: ClueDto;
-  onSaved: () => void;
-}) {
-  const cache = useQueryClient();
-  const updateClue = useUpdateClue();
-  const [text, setText] = useState(clue.clue);
-  const [answer, setAnswer] = useState(clue.revealedAnswer ?? '');
-  const [wordplay, setWordplay] = useState(clue.wordplay ?? '');
-  const [maxAttempts, setMaxAttempts] = useState(clue.maxAttempts);
-  const [error, setError] = useState('');
-  const normalizedAnswer = answer.trim().replace(/[^a-z0-9]/gi, '');
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError('');
-    if (text.trim().length < 4) { setError('A clue needs at least four characters.'); return; }
-    if (!normalizedAnswer) { setError('Add an answer with at least one letter or number.'); return; }
-    if (!wordplay.trim()) { setError('Add a short wordplay explanation.'); return; }
-    try {
-      const updated = await updateClue.mutateAsync({
-        slug,
-        data: {
-          clue: text.trim(),
-          answer: normalizedAnswer.toUpperCase(),
-          wordplay: wordplay.trim(),
-          maxAttempts,
-        },
-      });
-      cache.setQueryData(getGetClueQueryKey(slug), updated);
-      await Promise.all([
-        cache.invalidateQueries({ queryKey: getGetClueLeaderboardQueryKey(slug) }),
-        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
-        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
-      ]);
-      onSaved();
-    } catch {
-      setError('The clue could not be saved. Check your connection and try again.');
-    }
-  };
-
-  return <form className="paper-form clue-editor" onSubmit={submit}>
-    <div className="form-heading"><span className="form-index">SETTER'S DESK</span><h2>Update your clue</h2></div>
-    <label className="field-label" htmlFor="edit-clue-text">Your cryptic clue</label>
-    <textarea id="edit-clue-text" value={text} onChange={(event) => setText(event.target.value)} maxLength={240} required rows={3} />
-    <label className="field-label mt-6" htmlFor="edit-clue-answer">Answer</label>
-    <input id="edit-clue-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={40} required />
-    <label className="field-label mt-6" htmlFor="edit-clue-wordplay">Wordplay explanation</label>
-    <textarea id="edit-clue-wordplay" value={wordplay} onChange={(event) => setWordplay(event.target.value)} maxLength={1000} required rows={3} />
-    <div className="attempt-control edit-attempt-control"><div><h2>Maximum attempts</h2><p>Existing attempts are preserved.</p></div><div className="attempt-stepper"><button type="button" aria-label="Fewer attempts" onClick={() => setMaxAttempts(Math.max(1, maxAttempts - 1))}><span>−</span></button><strong>{maxAttempts}</strong><button type="button" aria-label="More attempts" onClick={() => setMaxAttempts(Math.min(10, maxAttempts + 1))}><span>+</span></button></div></div>
-    {error && <div className="form-error" role="alert"><X size={16} />{error}</div>}
-    <button className="button button-primary publish-button" type="submit" disabled={updateClue.isPending}><Save size={16} /> {updateClue.isPending ? 'Saving…' : 'Save changes'}</button>
-  </form>;
-}
-
 function useParamsSafe() { return useParams<{ slug: string }>(); }
 
 function DashboardPage() {
   const { data: dashboard, isLoading, isError, refetch } = useGetMyDashboard();
   const { data: profile } = useGetMyProfile();
+  const cache = useQueryClient();
+  const updateProfile = useUpdateMyProfile();
+  const [blurb, setBlurb] = useState('');
+  const [blurbError, setBlurbError] = useState('');
+  const [blurbSaved, setBlurbSaved] = useState(false);
+  useEffect(() => { setBlurb(profile?.blurb ?? ''); }, [profile?.publicId, profile?.blurb]);
+  const saveBlurb = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBlurbError('');
+    setBlurbSaved(false);
+    try {
+      const updated = await updateProfile.mutateAsync({ data: { blurb: blurb.trim() } });
+      cache.setQueryData(getGetMyProfileQueryKey(), updated);
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getGetMyProfileQueryKey() }),
+        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+      setBlurbSaved(true);
+    } catch (cause) {
+      setBlurbError(apiErrorMessage(cause, 'Your public blurb could not be saved. Please try again.'));
+    }
+  };
   return <><Header active="dashboard" /><main className="page-wrap dashboard-page">
     <div className="dash-welcome">
       <div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR LITTLE CORNER</div><h1 className="page-title">Good to see you, {profile?.publicId ?? 'solver'}.</h1><p>Your clues, your solves, your ongoing case for being the clever one.</p></div>
       <Link href="/create" className="button button-primary"><PenLine size={16} /> Set a new clue</Link>
     </div>
     {isLoading ? <DashboardSkeleton /> : isError || !dashboard ? <div className="state-panel"><h2>Your page is taking a moment.</h2><p>We couldn't fetch your puzzle notes just now.</p><button className="button button-outline" onClick={() => refetch()}>Refresh page <RotateCcw size={15} /></button></div> : <>
+      <form className="profile-blurb-form" onSubmit={(event) => void saveBlurb(event)} data-testid="form-public-blurb">
+        <div><span className="form-index">YOUR PUBLIC PROFILE</span><h2>A few words about your setter style.</h2><p>This short note appears beside your clues for everyone to see.</p></div>
+        <div className="blurb-field"><label className="field-label" htmlFor="profile-blurb">Public blurb <span className="optional-label">UP TO 280 CHARACTERS</span></label><textarea id="profile-blurb" data-testid="input-public-blurb" value={blurb} onChange={(event) => { setBlurb(event.target.value); setBlurbSaved(false); }} maxLength={280} rows={3} placeholder="A little about the kind of clues you like to write…" /><div className="field-hint"><span>Keep it friendly and puzzle-focused.</span><span>{blurb.length}/280</span></div>
+          {blurbError && <div className="form-error" role="alert" data-testid="status-blurb-error"><X size={16} />{blurbError}</div>}
+          {blurbSaved && <p className="save-confirmation" role="status" data-testid="status-blurb-saved"><Check size={15} /> Your blurb is up to date.</p>}
+          <button className="button button-outline" type="submit" data-testid="button-save-blurb" disabled={updateProfile.isPending}>{updateProfile.isPending ? 'Saving…' : 'Save public blurb'} <ArrowRight size={15} /></button>
+        </div>
+      </form>
       <div className="stats-strip">
         <div className="stat-block"><span className="stat-label">CLUES SET</span><strong data-testid="text-created-count">{dashboard.created}</strong><span className="stat-caption">little mysteries released</span></div>
         <div className="stat-block stat-highlight"><span className="stat-label">CLUES SOLVED</span><strong data-testid="text-solved-count">{dashboard.solved}</strong><span className="stat-caption">answers found out there</span></div>
@@ -729,6 +787,23 @@ function DashboardPage() {
       <div className="dash-note"><span><Sparkles size={17} /></span><p>Every new clue starts its own race. Share the link and let the solving begin.</p><Link href="/create">Make another <ArrowUpRight size={15} /></Link></div>
     </>}
   </main><Footer /></>;
+}
+
+function apiErrorMessage(cause: unknown, fallback: string) {
+  if (cause && typeof cause === 'object') {
+    const candidate = cause as { message?: unknown; data?: unknown; response?: { data?: unknown }; error?: unknown };
+    const nested = candidate.data ?? candidate.response?.data ?? candidate.error;
+    if (nested && typeof nested === 'object') {
+      const record = nested as { error?: unknown; message?: unknown; detail?: unknown; issues?: unknown; errors?: unknown };
+      if (typeof record.error === 'string') return record.error;
+      if (typeof record.message === 'string') return record.message;
+      if (typeof record.detail === 'string') return record.detail;
+      if (Array.isArray(record.issues)) return record.issues.map((issue) => typeof issue === 'string' ? issue : JSON.stringify(issue)).join(' ');
+      if (record.errors && typeof record.errors === 'object') return Object.entries(record.errors as Record<string, unknown>).map(([field, issues]) => `${field}: ${Array.isArray(issues) ? issues.join(', ') : String(issues)}`).join(' · ');
+    }
+    if (typeof candidate.message === 'string' && candidate.message.trim()) return candidate.message;
+  }
+  return fallback;
 }
 
 function Footer() {

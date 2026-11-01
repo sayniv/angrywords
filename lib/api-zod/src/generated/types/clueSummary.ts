@@ -13,6 +13,11 @@ export interface ClueSummary {
   answerLength: number;
   maxAttempts: number;
   setterName: string;
+  /** @nullable */
+  setterBlurb: string | null;
   solveCount: number;
+  /** @nullable */
+  averageRating: number | null;
+  ratingCount: number;
   createdAt: Date;
 }

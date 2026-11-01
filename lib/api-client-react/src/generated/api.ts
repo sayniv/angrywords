@@ -24,14 +24,19 @@ import type {
   AttemptResult,
   Clue,
   ClueInput,
+  ClueRatingInput,
+  ClueRatingSummary,
   ClueRetired,
   ClueStartResult,
   ClueSummary,
   Dashboard,
   HealthStatus,
   LeaderboardEntry,
+  ListCluesParams,
   ProfileInput,
-  PublicProfile
+  PublicProfile,
+  SetterLeaderboardEntry,
+  SolverLeaderboardEntry
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -139,20 +144,27 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
-export const getListCluesUrl = () => {
+export const getListCluesUrl = (params?: ListCluesParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/clues`
+  return stringifiedParams.length > 0 ? `/api/clues?${stringifiedParams}` : `/api/clues`
 }
 
 /**
  * @summary Browse published clues
  */
-export const listClues = async ( options?: Parameters<typeof customFetch>[1]): Promise<ClueSummary[]> => {
+export const listClues = async (params?: ListCluesParams, options?: Parameters<typeof customFetch>[1]): Promise<ClueSummary[]> => {
 
-  return customFetch<ClueSummary[]>(getListCluesUrl(),
+  return customFetch<ClueSummary[]>(getListCluesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -165,23 +177,23 @@ export const listClues = async ( options?: Parameters<typeof customFetch>[1]): P
 
 
 
-export const getListCluesQueryKey = () => {
+export const getListCluesQueryKey = (params?: ListCluesParams,) => {
     return [
-    `/api/clues`
+    `/api/clues`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListCluesQueryOptions = <TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListCluesQueryOptions = <TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<unknown>>(params?: ListCluesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListCluesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListCluesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClues>>> = ({ signal }) => listClues({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClues>>> = ({ signal }) => listClues(params, { signal, ...requestOptions });
 
 
 
@@ -199,11 +211,11 @@ export type ListCluesQueryError = ErrorType<unknown>
  */
 
 export function useListClues<TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListCluesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListCluesQueryOptions(options)
+  const queryOptions = getListCluesQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -381,95 +393,6 @@ export function useGetClue<TData = Awaited<ReturnType<typeof getClue>>, TError =
 
 
 
-export const getUpdateClueUrl = (slug: string,) => {
-
-
-
-
-  return `/api/clues/${slug}`
-}
-
-/**
- * @summary Update a clue challenge
- */
-export const updateClue = async (slug: string,
-    clueInput: ClueInput, options?: Parameters<typeof customFetch>[1]): Promise<Clue> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customFetch<Clue>(getUpdateClueUrl(slug),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(clueInput)
-  }
-);}
-
-
-
-
-
-export const getUpdateClueMutationKey = () => ['updateClue'] as const;
-
-export const getUpdateClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClue>>, TError,UpdateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateClue>>, TError,UpdateClueMutationVariables, TContext> => {
-
-const mutationKey = getUpdateClueMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateClue>>, UpdateClueMutationVariables> = (props) => {
-          const {slug,data} = props ?? {};
-
-          return  updateClue(slug,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type UpdateClueMutationResult = NonNullable<Awaited<ReturnType<typeof updateClue>>>
-    export type UpdateClueMutationBody = BodyType<ClueInput>
-    export type UpdateClueMutationError = ErrorType<void | ClueRetired>
-    export type UpdateClueMutationVariables = {slug: string;data: BodyType<ClueInput>}
-
-    /**
- * @summary Update a clue challenge
- */
-export const useUpdateClue = <TError = ErrorType<void | ClueRetired>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClue>>, TError,UpdateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof updateClue>>,
-        TError,
-        UpdateClueMutationVariables,
-        TContext
-      > => {
-      return useMutation(getUpdateClueMutationOptions(options));
-    }
-
 export const getRetireClueUrl = (slug: string,) => {
 
 
@@ -543,6 +466,249 @@ export const useRetireClue = <TError = ErrorType<void | ClueRetired>,
       > => {
       return useMutation(getRetireClueMutationOptions(options));
     }
+
+export const getRateClueUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}/rating`
+}
+
+/**
+ * @summary Rate a clue after solving it
+ */
+export const rateClue = async (slug: string,
+    clueRatingInput: ClueRatingInput, options?: Parameters<typeof customFetch>[1]): Promise<ClueRatingSummary> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ClueRatingSummary>(getRateClueUrl(slug),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clueRatingInput)
+  }
+);}
+
+
+
+
+
+export const getRateClueMutationKey = () => ['rateClue'] as const;
+
+export const getRateClueMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rateClue>>, TError,RateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rateClue>>, TError,RateClueMutationVariables, TContext> => {
+
+const mutationKey = getRateClueMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rateClue>>, RateClueMutationVariables> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  rateClue(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RateClueMutationResult = NonNullable<Awaited<ReturnType<typeof rateClue>>>
+    export type RateClueMutationBody = BodyType<ClueRatingInput>
+    export type RateClueMutationError = ErrorType<void>
+    export type RateClueMutationVariables = {slug: string;data: BodyType<ClueRatingInput>}
+
+    /**
+ * @summary Rate a clue after solving it
+ */
+export const useRateClue = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rateClue>>, TError,RateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rateClue>>,
+        TError,
+        RateClueMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRateClueMutationOptions(options));
+    }
+
+export const getGetSolverLeaderboardUrl = () => {
+
+
+
+
+  return `/api/leaderboards/solvers`
+}
+
+/**
+ * @summary Rank solvers by average successful solve time
+ */
+export const getSolverLeaderboard = async ( options?: Parameters<typeof customFetch>[1]): Promise<SolverLeaderboardEntry[]> => {
+
+  return customFetch<SolverLeaderboardEntry[]>(getGetSolverLeaderboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSolverLeaderboardQueryKey = () => {
+    return [
+    `/api/leaderboards/solvers`
+    ] as const;
+    }
+
+
+export const getGetSolverLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getSolverLeaderboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSolverLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSolverLeaderboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSolverLeaderboard>>> = ({ signal }) => getSolverLeaderboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSolverLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSolverLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getSolverLeaderboard>>>
+export type GetSolverLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rank solvers by average successful solve time
+ */
+
+export function useGetSolverLeaderboard<TData = Awaited<ReturnType<typeof getSolverLeaderboard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSolverLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSolverLeaderboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSetterLeaderboardUrl = () => {
+
+
+
+
+  return `/api/leaderboards/setters`
+}
+
+/**
+ * @summary Rank setters by average clue rating
+ */
+export const getSetterLeaderboard = async ( options?: Parameters<typeof customFetch>[1]): Promise<SetterLeaderboardEntry[]> => {
+
+  return customFetch<SetterLeaderboardEntry[]>(getGetSetterLeaderboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSetterLeaderboardQueryKey = () => {
+    return [
+    `/api/leaderboards/setters`
+    ] as const;
+    }
+
+
+export const getGetSetterLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getSetterLeaderboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSetterLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSetterLeaderboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSetterLeaderboard>>> = ({ signal }) => getSetterLeaderboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSetterLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSetterLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getSetterLeaderboard>>>
+export type GetSetterLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Rank setters by average clue rating
+ */
+
+export function useGetSetterLeaderboard<TData = Awaited<ReturnType<typeof getSetterLeaderboard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSetterLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSetterLeaderboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetClueLeaderboardUrl = (slug: string,) => {
 

@@ -13,4 +13,6 @@ export interface ProfileInput {
      * @pattern ^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$
      */
   publicId?: string;
+  /** @maxLength 280 */
+  blurb?: string;
 }

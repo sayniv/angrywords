@@ -15,6 +15,13 @@ export interface Clue {
   wordplay?: string | null;
   maxAttempts: number;
   setterName: string;
+  /** @nullable */
+  setterBlurb: string | null;
+  /** @nullable */
+  averageRating: number | null;
+  ratingCount: number;
+  /** @nullable */
+  userRating: number | null;
   isOwner?: boolean;
   createdAt: Date;
   /** @nullable */

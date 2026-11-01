@@ -20,6 +20,10 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Browse published clues
  */
+export const ListCluesQueryParams = zod.object({
+  "sort": zod.enum(['newest', 'rating']).optional()
+})
+
 export const ListCluesResponseItem = zod.object({
   "id": zod.number().int(),
   "slug": zod.string(),
@@ -27,7 +31,10 @@ export const ListCluesResponseItem = zod.object({
   "answerLength": zod.number().int(),
   "maxAttempts": zod.number().int(),
   "setterName": zod.string(),
+  "setterBlurb": zod.string().nullable(),
   "solveCount": zod.number().int(),
+  "averageRating": zod.number().nullable(),
+  "ratingCount": zod.number().int(),
   "createdAt": zod.coerce.date()
 })
 export const ListCluesResponse = zod.array(ListCluesResponseItem)
@@ -62,6 +69,10 @@ export const CreateClueResponse = zod.object({
   "wordplay": zod.string().nullish(),
   "maxAttempts": zod.number().int(),
   "setterName": zod.string(),
+  "setterBlurb": zod.string().nullable(),
+  "averageRating": zod.number().nullable(),
+  "ratingCount": zod.number().int(),
+  "userRating": zod.number().int().nullable(),
   "isOwner": zod.boolean().optional(),
   "createdAt": zod.coerce.date(),
   "userAttemptsUsed": zod.number().int().nullable(),
@@ -88,50 +99,10 @@ export const GetClueResponse = zod.object({
   "wordplay": zod.string().nullish(),
   "maxAttempts": zod.number().int(),
   "setterName": zod.string(),
-  "isOwner": zod.boolean().optional(),
-  "createdAt": zod.coerce.date(),
-  "userAttemptsUsed": zod.number().int().nullable(),
-  "userCompleted": zod.boolean().nullable(),
-  "userElapsedSeconds": zod.number().int().nullable(),
-  "userStartedAt": zod.coerce.date().nullable(),
-  "userSolved": zod.boolean().nullable(),
-  "revealedAnswer": zod.string().nullable()
-})
-
-
-/**
- * @summary Update a clue challenge
- */
-export const UpdateClueParams = zod.object({
-  "slug": zod.coerce.string()
-})
-
-export const updateClueBodyClueMin = 4;
-export const updateClueBodyClueMax = 240;
-
-export const updateClueBodyAnswerMax = 40;
-
-export const updateClueBodyWordplayMax = 1000;
-
-export const updateClueBodyMaxAttemptsMax = 10;
-
-
-
-export const UpdateClueBody = zod.object({
-  "clue": zod.string().min(updateClueBodyClueMin).max(updateClueBodyClueMax),
-  "answer": zod.string().min(1).max(updateClueBodyAnswerMax),
-  "wordplay": zod.string().min(1).max(updateClueBodyWordplayMax),
-  "maxAttempts": zod.number().int().min(1).max(updateClueBodyMaxAttemptsMax)
-})
-
-export const UpdateClueResponse = zod.object({
-  "id": zod.number().int(),
-  "slug": zod.string(),
-  "clue": zod.string(),
-  "answerLength": zod.number().int(),
-  "wordplay": zod.string().nullish(),
-  "maxAttempts": zod.number().int(),
-  "setterName": zod.string(),
+  "setterBlurb": zod.string().nullable(),
+  "averageRating": zod.number().nullable(),
+  "ratingCount": zod.number().int(),
+  "userRating": zod.number().int().nullable(),
   "isOwner": zod.boolean().optional(),
   "createdAt": zod.coerce.date(),
   "userAttemptsUsed": zod.number().int().nullable(),
@@ -151,6 +122,52 @@ export const RetireClueParams = zod.object({
 })
 
 export const RetireClueResponse = zod.void()
+
+
+/**
+ * @summary Rate a clue after solving it
+ */
+export const RateClueParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const rateClueBodyRatingMax = 5;
+
+
+
+export const RateClueBody = zod.object({
+  "rating": zod.number().int().min(1).max(rateClueBodyRatingMax)
+})
+
+export const RateClueResponse = zod.object({
+  "averageRating": zod.number().nullable(),
+  "ratingCount": zod.number().int(),
+  "userRating": zod.number().int()
+})
+
+
+/**
+ * @summary Rank solvers by average successful solve time
+ */
+export const GetSolverLeaderboardResponseItem = zod.object({
+  "rank": zod.number().int(),
+  "displayName": zod.string(),
+  "averageSeconds": zod.number(),
+  "solvedCount": zod.number().int()
+})
+export const GetSolverLeaderboardResponse = zod.array(GetSolverLeaderboardResponseItem)
+
+
+/**
+ * @summary Rank setters by average clue rating
+ */
+export const GetSetterLeaderboardResponseItem = zod.object({
+  "rank": zod.number().int(),
+  "displayName": zod.string(),
+  "averageRating": zod.number(),
+  "ratingCount": zod.number().int()
+})
+export const GetSetterLeaderboardResponse = zod.array(GetSetterLeaderboardResponseItem)
 
 
 /**
@@ -224,7 +241,10 @@ export const GetMyDashboardResponse = zod.object({
   "answerLength": zod.number().int(),
   "maxAttempts": zod.number().int(),
   "setterName": zod.string(),
+  "setterBlurb": zod.string().nullable(),
   "solveCount": zod.number().int(),
+  "averageRating": zod.number().nullable(),
+  "ratingCount": zod.number().int(),
   "createdAt": zod.coerce.date()
 }))
 })
@@ -236,7 +256,8 @@ export const GetMyDashboardResponse = zod.object({
 export const GetMyProfileResponse = zod.object({
   "publicId": zod.string(),
   "isGuest": zod.boolean(),
-  "needsSetup": zod.boolean()
+  "needsSetup": zod.boolean(),
+  "blurb": zod.string().nullable()
 })
 
 
@@ -248,16 +269,20 @@ export const updateMyProfileBodyPublicIdMax = 24;
 
 
 export const updateMyProfileBodyPublicIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$');
+export const updateMyProfileBodyBlurbMax = 280;
+
 
 
 export const UpdateMyProfileBody = zod.object({
-  "publicId": zod.string().min(updateMyProfileBodyPublicIdMin).max(updateMyProfileBodyPublicIdMax).regex(updateMyProfileBodyPublicIdRegExp).optional()
+  "publicId": zod.string().min(updateMyProfileBodyPublicIdMin).max(updateMyProfileBodyPublicIdMax).regex(updateMyProfileBodyPublicIdRegExp).optional(),
+  "blurb": zod.string().max(updateMyProfileBodyBlurbMax).optional()
 })
 
 export const UpdateMyProfileResponse = zod.object({
   "publicId": zod.string(),
   "isGuest": zod.boolean(),
-  "needsSetup": zod.boolean()
+  "needsSetup": zod.boolean(),
+  "blurb": zod.string().nullable()
 })
 
 

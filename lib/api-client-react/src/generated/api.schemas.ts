@@ -18,6 +18,13 @@ export interface Clue {
   wordplay?: string | null;
   maxAttempts: number;
   setterName: string;
+  /** @nullable */
+  setterBlurb: string | null;
+  /** @nullable */
+  averageRating: number | null;
+  ratingCount: number;
+  /** @nullable */
+  userRating: number | null;
   isOwner?: boolean;
   createdAt: string;
   /** @nullable */
@@ -41,7 +48,12 @@ export interface ClueSummary {
   answerLength: number;
   maxAttempts: number;
   setterName: string;
+  /** @nullable */
+  setterBlurb: string | null;
   solveCount: number;
+  /** @nullable */
+  averageRating: number | null;
+  ratingCount: number;
   createdAt: string;
 }
 
@@ -115,6 +127,8 @@ export interface PublicProfile {
   publicId: string;
   isGuest: boolean;
   needsSetup: boolean;
+  /** @nullable */
+  blurb: string | null;
 }
 
 export interface ProfileInput {
@@ -124,5 +138,48 @@ export interface ProfileInput {
      * @pattern ^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$
      */
   publicId?: string;
+  /** @maxLength 280 */
+  blurb?: string;
 }
+
+export interface ClueRatingInput {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+}
+
+export interface ClueRatingSummary {
+  /** @nullable */
+  averageRating: number | null;
+  ratingCount: number;
+  userRating: number;
+}
+
+export interface SolverLeaderboardEntry {
+  rank: number;
+  displayName: string;
+  averageSeconds: number;
+  solvedCount: number;
+}
+
+export interface SetterLeaderboardEntry {
+  rank: number;
+  displayName: string;
+  averageRating: number;
+  ratingCount: number;
+}
+
+export type ListCluesParams = {
+sort?: ListCluesSort;
+};
+
+export type ListCluesSort = typeof ListCluesSort[keyof typeof ListCluesSort];
+
+
+export const ListCluesSort = {
+  newest: 'newest',
+  rating: 'rating',
+} as const;
 

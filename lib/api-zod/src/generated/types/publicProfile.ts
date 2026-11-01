@@ -10,4 +10,6 @@ export interface PublicProfile {
   publicId: string;
   isGuest: boolean;
   needsSetup: boolean;
+  /** @nullable */
+  blurb: string | null;
 }

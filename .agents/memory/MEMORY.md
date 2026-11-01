@@ -1,1 +1,2 @@
-- [Clue retirement and edit history](clue-retirement-history.md) — retired clues keep solver records; edits preserve historical solves and active progress.
+- [Clue publication and history](clue-retirement-history.md) — published clues are immutable; retirement preserves solve, rating, and leaderboard history.
+- [Drizzle aggregate subqueries](drizzle-aggregate-aliases.md) — give aggregate SQL expressions explicit aliases before reading them from a derived table.

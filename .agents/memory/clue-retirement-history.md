@@ -1,10 +1,12 @@
 ---
-name: Clue retirement and edit history
-description: Product behavior to preserve when changing clue edits, retirement, and solve history.
+name: Clue publication and history
+description: Product behavior for clue review, immutable publication, retirement, and historical records.
 ---
 
-Retiring a clue is a soft retirement: hide it from active browsing, reject old shared links with a clear retired status, and retain attempts and leaderboard rows. Editing a clue preserves progress and completed solves; if a lower attempt limit is reached by an active solver, close that attempt as failed.
+Setters review the clue, answer, wordplay, and attempt limit before publishing. Once published, clue wording, answer, wordplay, and attempt limit cannot be edited.
 
-**Why:** Setters need to correct or withdraw a published clue without destroying solver history.
+Retiring a clue is a soft retirement: hide it from active browsing, reject old shared links with a clear retired status, and retain attempts, ratings, and leaderboard history.
 
-**How to apply:** Preserve these semantics in future clue lifecycle changes, API updates, and UI copy.
+**Why:** The user requires clue setters to confirm the exact content before publication and forbids edits afterward; retirement must not erase community history.
+
+**How to apply:** Preserve immutable publication and soft-retirement semantics in future clue lifecycle changes, API updates, and UI copy.

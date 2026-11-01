@@ -18,6 +18,7 @@ export const userProfilesTable = pgTable(
     publicId: varchar("public_id", { length: 48 }).notNull(),
     normalizedPublicId: varchar("normalized_public_id", { length: 48 }).notNull(),
     isGuest: boolean("is_guest").notNull().default(true),
+    blurb: text("blurb"),
     onboardingComplete: boolean("onboarding_complete").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -33,6 +33,13 @@ paths:
       operationId: listClues
       tags: [clues]
       summary: Browse published clues
+      parameters:
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [newest, rating]
       responses:
         "200":
           description: Published clue challenges
@@ -89,41 +96,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClueRetired"
-    patch:
-      operationId: updateClue
-      tags: [clues]
-      summary: Update a clue challenge
-      security:
-        - clerkSession: []
-      parameters:
-        - name: slug
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ClueInput"
-      responses:
-        "200":
-          description: Updated clue challenge
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Clue"
-        "403":
-          description: Only the original setter can update this clue
-        "404":
-          description: Clue not found
-        "410":
-          description: Clue has been retired
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ClueRetired"
     delete:
       operationId: retireClue
       tags: [clues]
@@ -149,6 +121,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClueRetired"
+  /clues/{slug}/rating:
+    put:
+      operationId: rateClue
+      tags: [clues]
+      summary: Rate a clue after solving it
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClueRatingInput"
+      responses:
+        "200":
+          description: Saved rating and current average
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRatingSummary"
+        "403":
+          description: Only a solver who completed the clue can rate it
+        "404":
+          description: Clue not found
+  /leaderboards/solvers:
+    get:
+      operationId: getSolverLeaderboard
+      tags: [profile]
+      summary: Rank solvers by average successful solve time
+      responses:
+        "200":
+          description: Fastest average solve times
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SolverLeaderboardEntry"
+  /leaderboards/setters:
+    get:
+      operationId: getSetterLeaderboard
+      tags: [profile]
+      summary: Rank setters by average clue rating
+      responses:
+        "200":
+          description: Highest average setter ratings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SetterLeaderboardEntry"
   /clues/{slug}/leaderboard:
     get:
       operationId: getClueLeaderboard
@@ -312,7 +342,7 @@ components:
         - status
     Clue:
       type: object
-      required: [id, slug, clue, answerLength, maxAttempts, setterName, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer]
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -321,6 +351,10 @@ components:
         wordplay: { type: ["string", "null"] }
         maxAttempts: { type: integer }
         setterName: { type: string }
+        setterBlurb: { type: ["string", "null"] }
+        averageRating: { type: ["number", "null"] }
+        ratingCount: { type: integer }
+        userRating: { type: ["integer", "null"] }
         isOwner: { type: boolean }
         createdAt: { type: string, format: date-time }
         userAttemptsUsed: { type: ["integer", "null"] }
@@ -331,7 +365,7 @@ components:
         revealedAnswer: { type: ["string", "null"] }
     ClueSummary:
       type: object
-      required: [id, slug, clue, answerLength, maxAttempts, setterName, solveCount, createdAt]
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, solveCount, averageRating, ratingCount, createdAt]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -339,7 +373,10 @@ components:
         answerLength: { type: integer }
         maxAttempts: { type: integer }
         setterName: { type: string }
+        setterBlurb: { type: ["string", "null"] }
         solveCount: { type: integer }
+        averageRating: { type: ["number", "null"] }
+        ratingCount: { type: integer }
         createdAt: { type: string, format: date-time }
     ClueInput:
       type: object
@@ -399,11 +436,12 @@ components:
             $ref: "#/components/schemas/ClueSummary"
     PublicProfile:
       type: object
-      required: [publicId, isGuest, needsSetup]
+      required: [publicId, isGuest, needsSetup, blurb]
       properties:
         publicId: { type: string }
         isGuest: { type: boolean }
         needsSetup: { type: boolean }
+        blurb: { type: ["string", "null"] }
     ProfileInput:
       type: object
       properties:
@@ -412,4 +450,35 @@ components:
           minLength: 3
           maxLength: 24
           pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$"
+        blurb:
+          type: string
+          maxLength: 280
+    ClueRatingInput:
+      type: object
+      required: [rating]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+    ClueRatingSummary:
+      type: object
+      required: [averageRating, ratingCount, userRating]
+      properties:
+        averageRating: { type: ["number", "null"] }
+        ratingCount: { type: integer }
+        userRating: { type: integer }
+    SolverLeaderboardEntry:
+      type: object
+      required: [rank, displayName, averageSeconds, solvedCount]
+      properties:
+        rank: { type: integer }
+        displayName: { type: string }
+        averageSeconds: { type: number }
+        solvedCount: { type: integer }
+    SetterLeaderboardEntry:
+      type: object
+      required: [rank, displayName, averageRating, ratingCount]
+      properties:
+        rank: { type: integer }
+        displayName: { type: string }
+        averageRating: { type: number }
+        ratingCount: { type: integer }
 
