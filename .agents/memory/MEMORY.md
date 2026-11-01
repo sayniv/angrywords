@@ -2,3 +2,4 @@
 - [Drizzle aggregate subqueries](drizzle-aggregate-aliases.md) — give aggregate SQL expressions explicit aliases before reading them from a derived table.
 - [Workflow port leftovers](workflow-port-leftovers.md) — a failed workflow can leave a child listener running; verify and clear the exact process before restarting again.
 - [Clue Sprint test status](clue-sprint-test-status.md) — the user said the site is in testing and has no other users yet.
+- [API TypeScript tests](api-typescript-tests.md) — use `tsx` when tests import workspace modules with extensionless TypeScript imports.

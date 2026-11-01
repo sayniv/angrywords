@@ -54,6 +54,11 @@ import {
   getCompletedAttemptResult,
   hasSuccessfulSolve,
 } from "../lib/clue-progress";
+import {
+  getDashboardActivityScope,
+  getSolverActivityState,
+  getSolverProgressScope,
+} from "../lib/solver-activity";
 
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
@@ -464,12 +469,7 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     ? await db
         .select()
         .from(solverProgressTable)
-        .where(
-          and(
-            eq(solverProgressTable.clueId, clue.id),
-            eq(solverProgressTable.userId, userId),
-          ),
-        )
+        .where(getSolverProgressScope(clue.id, userId))
         .limit(1)
     : [];
 
@@ -992,12 +992,7 @@ router.post(
     const [progress] = await db
       .select()
       .from(solverProgressTable)
-      .where(
-        and(
-          eq(solverProgressTable.clueId, clue.id),
-          eq(solverProgressTable.userId, userId),
-        ),
-      )
+      .where(getSolverProgressScope(clue.id, userId))
       .limit(1);
     const completed = Boolean(progress.solvedAt || progress.failedAt);
     const elapsedSeconds = completed
@@ -1519,12 +1514,7 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
     .select({ clue: cluesTable, progress: solverProgressTable })
     .from(solverProgressTable)
     .innerJoin(cluesTable, eq(solverProgressTable.clueId, cluesTable.id))
-    .where(
-      and(
-        eq(solverProgressTable.userId, userId),
-        isNull(cluesTable.retiredAt),
-      ),
-    )
+    .where(getDashboardActivityScope(userId))
     .orderBy(desc(solverProgressTable.startedAt))
     .limit(10);
   const recentActivity = activityRows.map(({ clue, progress }) => ({
@@ -1536,11 +1526,7 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
     setterName: clue.setterName,
     attemptsUsed: progress.attemptsUsed,
     attemptsRemaining: Math.max(0, clue.maxAttempts - progress.attemptsUsed),
-    state: progress.solvedAt
-      ? "solved" as const
-      : progress.failedAt
-        ? "failed" as const
-        : "in-progress" as const,
+    state: getSolverActivityState(progress),
     elapsedSeconds: progress.solvedAt || progress.failedAt
       ? progress.elapsedSeconds ?? 0
       : Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000)),
