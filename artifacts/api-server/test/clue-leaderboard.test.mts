@@ -56,6 +56,73 @@ test("clue solves are divided into no-assist and assist tiers and ranked indepen
   ]);
 });
 
+test("each leaderboard category keeps its own 50 fastest eligible solves", () => {
+  const noHintSolves = Array.from({ length: 60 }, (_, index) =>
+    row({
+      userId: `no-hint-${index}`,
+      elapsedSeconds: 100 + index,
+      solvedAt: solvedAt(index),
+    }),
+  );
+  const hintedSolves = Array.from({ length: 60 }, (_, index) =>
+    row({
+      userId: `hinted-${index}`,
+      elapsedSeconds: 200 + index,
+      hintsRevealed: 1,
+      solvedAt: solvedAt(index),
+    }),
+  );
+  const assistSolves = Array.from({ length: 60 }, (_, index) =>
+    row({
+      userId: `assist-${index}`,
+      elapsedSeconds: 300 + index,
+      hintsRevealed: index % 2,
+      assistEnabled: true,
+      solvedAt: solvedAt(index),
+    }),
+  );
+
+  const entries = buildClueLeaderboardEntries(
+    [...noHintSolves, ...hintedSolves, ...assistSolves].reverse(),
+    new Map(),
+  );
+
+  assert.equal(entries.noHintsNoAssist.length, 50);
+  assert.equal(entries.hintsUsedNoAssist.length, 50);
+  assert.equal(entries.assistUsed.length, 50);
+  assert.deepEqual(
+    entries.noHintsNoAssist.map(({ rank, elapsedSeconds }) => [rank, elapsedSeconds]),
+    Array.from({ length: 50 }, (_, index) => [index + 1, 100 + index]),
+  );
+  assert.deepEqual(
+    entries.hintsUsedNoAssist.map(({ rank, elapsedSeconds }) => [rank, elapsedSeconds]),
+    Array.from({ length: 50 }, (_, index) => [index + 1, 200 + index]),
+  );
+  assert.deepEqual(
+    entries.assistUsed.map(({ rank, elapsedSeconds }) => [rank, elapsedSeconds]),
+    Array.from({ length: 50 }, (_, index) => [index + 1, 300 + index]),
+  );
+});
+
+test("revealing hints places a no-assist solve only on the hints-used board", () => {
+  const entries = buildClueLeaderboardEntries(
+    [
+      row({ userId: "without-hints", hintsRevealed: 0 }),
+      row({ userId: "with-hints", hintsRevealed: 2 }),
+      row({ userId: "assist-with-hints", hintsRevealed: 1, assistEnabled: true }),
+    ],
+    new Map([
+      ["without-hints", "Without hints"],
+      ["with-hints", "With hints"],
+      ["assist-with-hints", "Assist with hints"],
+    ]),
+  );
+
+  assert.deepEqual(entries.noHintsNoAssist.map(({ displayName }) => displayName), ["Without hints"]);
+  assert.deepEqual(entries.hintsUsedNoAssist.map(({ displayName }) => displayName), ["With hints"]);
+  assert.deepEqual(entries.assistUsed.map(({ displayName }) => displayName), ["Assist with hints"]);
+});
+
 test("attempt count and solve time break ties within each category", () => {
   const entries = buildClueLeaderboardEntries(
     [

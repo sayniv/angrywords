@@ -7,4 +7,4 @@ Node's built-in TypeScript stripping does not resolve the workspace's extensionl
 
 **Why:** Direct Node test runs failed to resolve schema imports used by the account-scoping helpers.
 
-**How to apply:** Keep the API test script on `tsx --test` if tests begin importing shared workspace source modules.
+**How to apply:** Keep the API test script on `tsx --test` if tests begin importing shared workspace source modules. If API typechecking reports stale generated workspace types, run `pnpm run typecheck:libs` before diagnosing application code.
