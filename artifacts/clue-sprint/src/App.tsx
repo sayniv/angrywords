@@ -21,7 +21,7 @@ import {
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   useListClues, useRateClue, useReportClue, useRetireClue, useRevealClueHint, useStartClue, useSubmitAttempt, useUpdateMyProfile,
-  type SolverActivity,
+  type ClueLeaderboard, type SolverActivity,
 } from '@workspace/api-client-react';
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
@@ -518,6 +518,40 @@ function PublicLeaderboard({ title, note, mode, data, loading, failed, retry }: 
   </section>;
 }
 
+function ClueLeaderboardSection({ title, category, entries, loading, failed, retry }: {
+  title: string;
+  category: 'no-hints' | 'hints-used';
+  entries?: ClueLeaderboard['noHints'];
+  loading: boolean;
+  failed: boolean;
+  retry: () => void;
+}) {
+  const headingId = `clue-board-${category}-heading`;
+  return <section className="clue-board-category" aria-labelledby={headingId} data-testid={`section-leaderboard-${category}`}>
+    <h3 id={headingId}>{title}</h3>
+    {loading ? <LeaderboardSkeleton /> : failed ? (
+      <div className="board-empty" role="alert">
+        <p>Could not load this board just now.</p>
+        <button className="text-button" type="button" data-testid={`button-retry-leaderboard-${category}`} onClick={retry}>Try again</button>
+      </div>
+    ) : entries?.length ? (
+      <ol className="leaderboard" data-testid={`list-leaderboard-${category}`}>
+        {entries.map((entry) => <li className={`leader-row ${entry.rank === 1 ? 'leader-first' : ''}`} key={`${entry.rank}-${entry.displayName}-${entry.solvedAt}`} data-testid={`row-leader-${category}-${entry.rank}`}>
+          <span className={`rank-badge rank-${entry.rank}`}>{entry.rank === 1 ? <Crown size={15} /> : String(entry.rank).padStart(2, '0')}</span>
+          <div className="leader-person"><strong>{entry.displayName}</strong><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
+          <span className="leader-time">{formatTime(entry.elapsedSeconds)}</span>
+        </li>)}
+      </ol>
+    ) : (
+      <div className="board-empty">
+        <div className="empty-medal"><Trophy size={20} /></div>
+        <strong>{category === 'no-hints' ? 'No hint-free solves yet.' : 'No hint-assisted solves yet.'}</strong>
+        <p>Be the first name on this board.</p>
+      </div>
+    )}
+  </section>;
+}
+
 function Step({ number, icon, title, text }: { number: string; icon: ReactNode; title: string; text: string }) {
   return <div className="how-step"><div className="step-icon">{icon}</div><span className="step-number">{number}</span><div><h3>{title}</h3><p>{text}</p></div></div>;
 }
@@ -994,15 +1028,24 @@ function ChallengePage() {
         </section>
         <aside className="challenge-aside">
           <div className="board-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE RACE SO FAR</div><h2>Fastest solves</h2></div><Trophy size={22} /></div>
-          <p className="board-subtitle">Every clue gets its own little hall of fame.</p>
-          {leaderboardLoading ? <LeaderboardSkeleton /> : leaderboardError ? <div className="board-empty"><p>Could not load the board just now.</p><button className="text-button" onClick={() => refetchLeaderboard()}>Try again</button></div> : leaderboard?.length ? (
-            <ol className="leaderboard" data-testid="list-leaderboard">{leaderboard.map((entry) => <li className={`leader-row ${entry.rank === 1 ? 'leader-first' : ''}`} key={`${entry.rank}-${entry.displayName}-${entry.solvedAt}`} data-testid={`row-leader-${entry.rank}`}>
-              <span className={`rank-badge rank-${entry.rank}`}>{entry.rank === 1 ? <Crown size={15} /> : String(entry.rank).padStart(2, '0')}</span>
-              <div className="leader-person"><strong>{entry.displayName}</strong><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
-              <span className="leader-time">{formatTime(entry.elapsedSeconds)}</span>
-            </li>)}</ol>
-          ) : <div className="board-empty"><div className="empty-medal"><Trophy size={20} /></div><strong>It's a clean slate.</strong><p>Be the first name on this board.</p></div>}
-              <div className="board-footnote"><span className="board-star"><Sparkles size={18} /></span><span>Fastest time wins.<br />Fewest guesses is a fine flex, too.</span></div>
+          <p className="board-subtitle">Compare solves with and without hints.</p>
+          <ClueLeaderboardSection
+            title="No hints"
+            category="no-hints"
+            entries={leaderboard?.noHints}
+            loading={leaderboardLoading}
+            failed={leaderboardError}
+            retry={() => void refetchLeaderboard()}
+          />
+          <ClueLeaderboardSection
+            title="Hints used"
+            category="hints-used"
+            entries={leaderboard?.hintsUsed}
+            loading={leaderboardLoading}
+            failed={leaderboardError}
+            retry={() => void refetchLeaderboard()}
+          />
+          <div className="board-footnote"><span className="board-star"><Sparkles size={18} /></span><span>Fastest time wins.<br />Hint penalties are included.</span></div>
           <Link href="/" className="board-browse">Browse another clue <ArrowRight size={15} /></Link>
         </aside>
       </div>

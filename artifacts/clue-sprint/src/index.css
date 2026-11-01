@@ -662,6 +662,11 @@
 .board-heading h2 { margin: 7px 0 0; color: var(--ink); font: 600 25px var(--app-font-serif); letter-spacing: -.04em; }
 .board-heading .eyebrow { font-size: 9px; }
 .board-subtitle { margin: 8px 0 18px; color: #817366; font-size: 11px; }
+.clue-board-category { margin-top: 20px; padding-top: 17px; border-top: 1px solid #dbd0bf; }
+.clue-board-category h3 { margin: 0 0 10px; color: var(--ink); font: 600 18px var(--app-font-serif); letter-spacing: -.025em; }
+.clue-board-category .board-empty { min-height: 136px; }
+.clue-board-category .leaderboard { border-top: 0; }
+.clue-board-category .leader-row:first-child { padding-top: 4px; }
 .leaderboard { margin: 0; padding: 0; list-style: none; border-top: 1px solid #dbd0bf; }
 .leader-row { display: flex; align-items: center; gap: 11px; padding: 13px 0; border-bottom: 1px solid #dbd0bf; }
 .rank-badge { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; color: #877866; background: #f9f5ec; border: 1px solid #d9cebd; border-radius: 50%; font: 10px var(--app-font-mono); }

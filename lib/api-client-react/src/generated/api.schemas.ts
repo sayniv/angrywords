@@ -170,6 +170,11 @@ export interface LeaderboardEntry {
   solvedAt: string;
 }
 
+export interface ClueLeaderboard {
+  noHints: LeaderboardEntry[];
+  hintsUsed: LeaderboardEntry[];
+}
+
 export type SolverActivityState = typeof SolverActivityState[keyof typeof SolverActivityState];
 
 

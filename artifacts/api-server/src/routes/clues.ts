@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { and, asc, avg, count, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, avg, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import {
   AttemptResult,
   CreateClueBody,
@@ -77,6 +77,7 @@ import {
   getSolverProgressScope,
   serializeSolverActivity,
 } from "../lib/solver-activity";
+import { buildClueLeaderboardEntries } from "../lib/clue-leaderboard";
 
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
@@ -1061,38 +1062,41 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
     });
     return;
   }
-  const rows = await db
-    .select({
-      userId: solverProgressTable.userId,
-      elapsedSeconds: solverProgressTable.elapsedSeconds,
-      attemptsUsed: solverProgressTable.attemptsUsed,
-      solvedAt: solverProgressTable.solvedAt,
-    })
-    .from(solverProgressTable)
-    .where(
-      and(
-        eq(solverProgressTable.clueId, clue.id),
-        isNotNull(solverProgressTable.solvedAt),
-      ),
-    )
-    .orderBy(
-      asc(solverProgressTable.elapsedSeconds),
-      asc(solverProgressTable.attemptsUsed),
-      asc(solverProgressTable.solvedAt),
-    )
-    .limit(50);
+  const selectLeaderboardRows = (hasHints: boolean) =>
+    db
+      .select({
+        userId: solverProgressTable.userId,
+        elapsedSeconds: solverProgressTable.elapsedSeconds,
+        attemptsUsed: solverProgressTable.attemptsUsed,
+        hintsRevealed: solverProgressTable.hintsRevealed,
+        solvedAt: solverProgressTable.solvedAt,
+        failedAt: solverProgressTable.failedAt,
+      })
+      .from(solverProgressTable)
+      .where(
+        and(
+          eq(solverProgressTable.clueId, clue.id),
+          isNotNull(solverProgressTable.solvedAt),
+          isNull(solverProgressTable.failedAt),
+          hasHints
+            ? gt(solverProgressTable.hintsRevealed, 0)
+            : eq(solverProgressTable.hintsRevealed, 0),
+        ),
+      )
+      .orderBy(
+        asc(solverProgressTable.elapsedSeconds),
+        asc(solverProgressTable.attemptsUsed),
+        asc(solverProgressTable.solvedAt),
+      )
+      .limit(50);
+  const [noHintRows, hintRows] = await Promise.all([
+    selectLeaderboardRows(false),
+    selectLeaderboardRows(true),
+  ]);
+  const rows = [...noHintRows, ...hintRows];
   const publicIds = await publicIdsForUsers(rows.map((row) => row.userId));
-  res.json(
-    GetClueLeaderboardResponse.parse(
-      rows.map((row, index) => ({
-        rank: index + 1,
-        displayName: publicIds.get(row.userId) ?? "Guest solver",
-        elapsedSeconds: row.elapsedSeconds ?? 0,
-        attemptsUsed: row.attemptsUsed,
-        solvedAt: row.solvedAt,
-      })),
-    ),
-  );
+  const entries = buildClueLeaderboardEntries(rows, publicIds);
+  res.json(GetClueLeaderboardResponse.parse(entries));
 });
 
 router.post(

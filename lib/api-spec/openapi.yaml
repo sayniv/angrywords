@@ -336,13 +336,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Ranked successful solves
+          description: Independently ranked successful solves by hint usage
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LeaderboardEntry"
+                $ref: "#/components/schemas/ClueLeaderboard"
         "410":
           description: Clue has been retired or blocked after community reports
           content:
@@ -721,6 +719,16 @@ components:
         elapsedSeconds: { type: integer }
         attemptsUsed: { type: integer }
         solvedAt: { type: string, format: date-time }
+    ClueLeaderboard:
+      type: object
+      required: [noHints, hintsUsed]
+      properties:
+        noHints:
+          type: array
+          items: { $ref: "#/components/schemas/LeaderboardEntry" }
+        hintsUsed:
+          type: array
+          items: { $ref: "#/components/schemas/LeaderboardEntry" }
     Dashboard:
       type: object
       required: [created, solved, recentClues, recentActivity, hasMoreActivity]

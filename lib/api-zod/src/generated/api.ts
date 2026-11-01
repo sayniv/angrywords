@@ -293,14 +293,22 @@ export const GetClueLeaderboardParams = zod.object({
   "slug": zod.coerce.string()
 })
 
-export const GetClueLeaderboardResponseItem = zod.object({
+export const GetClueLeaderboardResponse = zod.object({
+  "noHints": zod.array(zod.object({
   "rank": zod.number().int(),
   "displayName": zod.string(),
   "elapsedSeconds": zod.number().int(),
   "attemptsUsed": zod.number().int(),
   "solvedAt": zod.coerce.date()
+})),
+  "hintsUsed": zod.array(zod.object({
+  "rank": zod.number().int(),
+  "displayName": zod.string(),
+  "elapsedSeconds": zod.number().int(),
+  "attemptsUsed": zod.number().int(),
+  "solvedAt": zod.coerce.date()
+}))
 })
-export const GetClueLeaderboardResponse = zod.array(GetClueLeaderboardResponseItem)
 
 
 /**

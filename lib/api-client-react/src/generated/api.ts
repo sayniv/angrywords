@@ -31,6 +31,7 @@ import type {
   ClueAppealReview,
   ClueHintReveal,
   ClueInput,
+  ClueLeaderboard,
   CluePublishLimitError,
   CluePublishQuota,
   ClueRatingInput,
@@ -42,7 +43,6 @@ import type {
   Dashboard,
   GetMyActivityParams,
   HealthStatus,
-  LeaderboardEntry,
   ListCluesParams,
   ProfileInput,
   PublicProfile,
@@ -1139,9 +1139,9 @@ export const getGetClueLeaderboardUrl = (slug: string,) => {
 /**
  * @summary Get a clue leaderboard
  */
-export const getClueLeaderboard = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<LeaderboardEntry[]> => {
+export const getClueLeaderboard = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<ClueLeaderboard> => {
 
-  return customFetch<LeaderboardEntry[]>(getGetClueLeaderboardUrl(slug),
+  return customFetch<ClueLeaderboard>(getGetClueLeaderboardUrl(slug),
   {
     ...options,
     method: 'GET'
