@@ -45,16 +45,13 @@ export const createClueBodyWordplayMax = 1000;
 
 export const createClueBodyMaxAttemptsMax = 10;
 
-export const createClueBodyDisplayNameMax = 48;
-
 
 
 export const CreateClueBody = zod.object({
   "clue": zod.string().min(createClueBodyClueMin).max(createClueBodyClueMax),
   "answer": zod.string().min(1).max(createClueBodyAnswerMax),
   "wordplay": zod.string().min(1).max(createClueBodyWordplayMax),
-  "maxAttempts": zod.number().int().min(1).max(createClueBodyMaxAttemptsMax),
-  "displayName": zod.string().max(createClueBodyDisplayNameMax).optional()
+  "maxAttempts": zod.number().int().min(1).max(createClueBodyMaxAttemptsMax)
 })
 
 export const CreateClueResponse = zod.object({
@@ -128,13 +125,10 @@ export const SubmitAttemptParams = zod.object({
 
 export const submitAttemptBodyAnswerMax = 80;
 
-export const submitAttemptBodyDisplayNameMax = 48;
-
 
 
 export const SubmitAttemptBody = zod.object({
-  "answer": zod.string().min(1).max(submitAttemptBodyAnswerMax),
-  "displayName": zod.string().max(submitAttemptBodyDisplayNameMax).optional()
+  "answer": zod.string().min(1).max(submitAttemptBodyAnswerMax)
 })
 
 export const SubmitAttemptResponse = zod.object({
@@ -179,6 +173,37 @@ export const GetMyDashboardResponse = zod.object({
   "solveCount": zod.number().int(),
   "createdAt": zod.coerce.date()
 }))
+})
+
+
+/**
+ * @summary Get or create the signed-in user's public profile
+ */
+export const GetMyProfileResponse = zod.object({
+  "publicId": zod.string(),
+  "isGuest": zod.boolean(),
+  "needsSetup": zod.boolean()
+})
+
+
+/**
+ * @summary Choose a public ID or continue with the generated guest ID
+ */
+export const updateMyProfileBodyPublicIdMin = 3;
+export const updateMyProfileBodyPublicIdMax = 24;
+
+
+export const updateMyProfileBodyPublicIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$');
+
+
+export const UpdateMyProfileBody = zod.object({
+  "publicId": zod.string().min(updateMyProfileBodyPublicIdMin).max(updateMyProfileBodyPublicIdMax).regex(updateMyProfileBodyPublicIdRegExp).optional()
+})
+
+export const UpdateMyProfileResponse = zod.object({
+  "publicId": zod.string(),
+  "isGuest": zod.boolean(),
+  "needsSetup": zod.boolean()
 })
 
 

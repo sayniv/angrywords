@@ -61,6 +61,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Clue"
+        "409":
+          description: Complete public ID setup before publishing
   /clues/{slug}:
     get:
       operationId: getClue
@@ -81,8 +83,6 @@ paths:
                 $ref: "#/components/schemas/Clue"
         "404":
           description: Clue not found
-        "403":
-          description: Setters cannot compete on their own clue
   /clues/{slug}/leaderboard:
     get:
       operationId: getClueLeaderboard
@@ -133,6 +133,8 @@ paths:
           description: Clue not found
         "403":
           description: Setters cannot compete on their own clue
+        "409":
+          description: Complete public ID setup before solving
   /clues/{slug}/start:
     post:
       operationId: startClue
@@ -155,6 +157,10 @@ paths:
                 $ref: "#/components/schemas/ClueStartResult"
         "404":
           description: Clue not found
+        "403":
+          description: Setters cannot compete on their own clue
+        "409":
+          description: Complete public ID setup before solving
   /me/dashboard:
     get:
       operationId: getMyDashboard
@@ -169,6 +175,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Dashboard"
+  /me/profile:
+    get:
+      operationId: getMyProfile
+      tags: [profile]
+      summary: Get or create the signed-in user's public profile
+      security:
+        - clerkSession: []
+      responses:
+        "200":
+          description: Public profile settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfile"
+    patch:
+      operationId: updateMyProfile
+      tags: [profile]
+      summary: Choose a public ID or continue with the generated guest ID
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "200":
+          description: Updated public profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfile"
+        "400":
+          description: Invalid public ID
+        "409":
+          description: Public ID is already in use
 components:
   securitySchemes:
     clerkSession:
@@ -222,13 +265,11 @@ components:
         answer: { type: string, minLength: 1, maxLength: 40 }
         wordplay: { type: string, minLength: 1, maxLength: 1000 }
         maxAttempts: { type: integer, minimum: 1, maximum: 10 }
-        displayName: { type: string, maxLength: 48 }
     AttemptInput:
       type: object
       required: [answer]
       properties:
         answer: { type: string, minLength: 1, maxLength: 80 }
-        displayName: { type: string, maxLength: 48 }
     AttemptResult:
       type: object
       required: [correct, attemptsUsed, attemptsRemaining, completed, elapsedSeconds]
@@ -267,4 +308,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ClueSummary"
+    PublicProfile:
+      type: object
+      required: [publicId, isGuest, needsSetup]
+      properties:
+        publicId: { type: string }
+        isGuest: { type: boolean }
+        needsSetup: { type: boolean }
+    ProfileInput:
+      type: object
+      properties:
+        publicId:
+          type: string
+          minLength: 3
+          maxLength: 24
+          pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$"
 

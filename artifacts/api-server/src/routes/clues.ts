@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
 import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
@@ -11,14 +11,17 @@ import {
   GetClueParams,
   GetClueResponse,
   GetMyDashboardResponse,
+  GetMyProfileResponse,
   ListCluesResponse,
   StartClueParams,
   StartClueResponse,
   SubmitAttemptBody,
   SubmitAttemptParams,
   SubmitAttemptResponse,
+  UpdateMyProfileBody,
+  UpdateMyProfileResponse,
 } from "@workspace/api-zod";
-import { db, cluesTable, solverProgressTable } from "@workspace/db";
+import { db, cluesTable, solverProgressTable, userProfilesTable } from "@workspace/db";
 
 const router: IRouter = Router();
 const requireAuth: RequestHandler = (req, res, next) => {
@@ -33,9 +36,78 @@ function normalizeAnswer(value: string): string {
   return value.toLocaleUpperCase("en").replace(/[^A-Z0-9]/g, "");
 }
 
-function displayName(value: string | undefined, fallback: string): string {
-  const clean = value?.trim().replace(/\s+/g, " ").slice(0, 48);
-  return clean || fallback;
+function publicProfileResponse(profile: {
+  publicId: string;
+  isGuest: boolean;
+  onboardingComplete: boolean;
+}) {
+  return {
+    publicId: profile.publicId,
+    isGuest: profile.isGuest,
+    needsSetup: !profile.onboardingComplete,
+  };
+}
+
+async function ensureProfile(userId: string) {
+  const [existing] = await db
+    .select()
+    .from(userProfilesTable)
+    .where(eq(userProfilesTable.userId, userId))
+    .limit(1);
+  if (existing) return existing;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    // Time prefix plus a cryptographic suffix; the unique index remains the final
+    // collision guard, and a collision simply retries with a fresh number.
+    const guestNumber = BigInt(Date.now()) * 1_000n + BigInt(randomInt(0, 1_000));
+    const publicId = `Guest ${guestNumber}`;
+    const [created] = await db
+      .insert(userProfilesTable)
+      .values({
+        userId,
+        publicId,
+        normalizedPublicId: publicId.toLowerCase(),
+        isGuest: true,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (created) {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(cluesTable)
+          .set({ setterName: created.publicId })
+          .where(eq(cluesTable.setterUserId, userId));
+        await tx
+          .update(solverProgressTable)
+          .set({ displayName: created.publicId })
+          .where(eq(solverProgressTable.userId, userId));
+      });
+      return created;
+    }
+
+    const [concurrent] = await db
+      .select()
+      .from(userProfilesTable)
+      .where(eq(userProfilesTable.userId, userId))
+      .limit(1);
+    if (concurrent) return concurrent;
+  }
+  throw new Error("Could not reserve a unique guest ID.");
+}
+
+async function publicIdsForUsers(userIds: string[]): Promise<Map<string, string>> {
+  if (!userIds.length) return new Map();
+  const profiles = await db
+    .select({ userId: userProfilesTable.userId, publicId: userProfilesTable.publicId })
+    .from(userProfilesTable)
+    .where(inArray(userProfilesTable.userId, userIds));
+  return new Map(profiles.map((profile) => [profile.userId, profile.publicId]));
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; cause?: { code?: unknown } };
+  return candidate.code === "23505" || candidate.cause?.code === "23505";
 }
 
 async function solveCounts(clueIds: number[]): Promise<Map<number, number>> {
@@ -60,13 +132,14 @@ router.get("/clues", async (_req, res): Promise<void> => {
     .orderBy(desc(cluesTable.createdAt))
     .limit(30);
   const counts = await solveCounts(clues.map((clue) => clue.id));
+  const publicIds = await publicIdsForUsers(clues.map((clue) => clue.setterUserId));
   const response = clues.map((clue) => ({
     id: clue.id,
     slug: clue.slug,
     clue: clue.clue,
     answerLength: normalizeAnswer(clue.answer).length,
     maxAttempts: clue.maxAttempts,
-    setterName: clue.setterName,
+    setterName: publicIds.get(clue.setterUserId) ?? "Puzzle setter",
     solveCount: counts.get(clue.id) ?? 0,
     createdAt: clue.createdAt,
   }));
@@ -81,6 +154,11 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
   }
 
   const auth = getAuth(req);
+  const profile = await ensureProfile(auth.userId!);
+  if (!profile.onboardingComplete) {
+    res.status(409).json({ error: "Choose a public ID before publishing a clue." });
+    return;
+  }
   const answer = normalizeAnswer(parsed.data.answer);
   if (!answer) {
     res.status(400).json({ error: "The answer must contain at least one letter or number." });
@@ -97,7 +175,7 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
       wordplay: parsed.data.wordplay?.trim() || null,
       maxAttempts: parsed.data.maxAttempts,
       setterUserId: auth.userId!,
-      setterName: displayName(parsed.data.displayName, "Anonymous Setter"),
+      setterName: profile.publicId,
     })
     .returning();
 
@@ -139,6 +217,10 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
   }
 
   const userId = getAuth(req).userId;
+  const setterPublicId =
+    userId === clue.setterUserId
+      ? (await ensureProfile(clue.setterUserId)).publicId
+      : (await publicIdsForUsers([clue.setterUserId])).get(clue.setterUserId) ?? "Puzzle setter";
   const [progress] = userId
     ? await db
         .select()
@@ -167,7 +249,7 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
         ? clue.wordplay
         : null,
     maxAttempts: clue.maxAttempts,
-    setterName: clue.setterName,
+    setterName: setterPublicId,
     isOwner: clue.setterUserId === userId,
     createdAt: clue.createdAt,
     userAttemptsUsed: progress?.attemptsUsed ?? null,
@@ -200,7 +282,7 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
   }
   const rows = await db
     .select({
-      displayName: solverProgressTable.displayName,
+      userId: solverProgressTable.userId,
       elapsedSeconds: solverProgressTable.elapsedSeconds,
       attemptsUsed: solverProgressTable.attemptsUsed,
       solvedAt: solverProgressTable.solvedAt,
@@ -218,11 +300,12 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
       asc(solverProgressTable.solvedAt),
     )
     .limit(50);
+  const publicIds = await publicIdsForUsers(rows.map((row) => row.userId));
   res.json(
     GetClueLeaderboardResponse.parse(
       rows.map((row, index) => ({
         rank: index + 1,
-        displayName: row.displayName,
+        displayName: publicIds.get(row.userId) ?? "Guest solver",
         elapsedSeconds: row.elapsedSeconds ?? 0,
         attemptsUsed: row.attemptsUsed,
         solvedAt: row.solvedAt,
@@ -250,6 +333,11 @@ router.post(
       return;
     }
     const userId = getAuth(req).userId!;
+    const profile = await ensureProfile(userId);
+    if (!profile.onboardingComplete) {
+      res.status(409).json({ error: "Choose a public ID before solving a clue." });
+      return;
+    }
     if (userId === clue.setterUserId) {
       res.status(403).json({ error: "Setters cannot compete on their own clue." });
       return;
@@ -259,7 +347,7 @@ router.post(
       .values({
         clueId: clue.id,
         userId,
-        displayName: "Solver",
+        displayName: profile.publicId,
       })
       .onConflictDoNothing({
         target: [solverProgressTable.clueId, solverProgressTable.userId],
@@ -320,6 +408,11 @@ router.post(
       res.status(403).json({ error: "Setters cannot compete on their own clue." });
       return;
     }
+    const profile = await ensureProfile(userId);
+    if (!profile.onboardingComplete) {
+      res.status(409).json({ error: "Choose a public ID before solving a clue." });
+      return;
+    }
     const now = new Date();
     const result = await db.transaction(async (tx) => {
       await tx
@@ -327,7 +420,7 @@ router.post(
         .values({
           clueId: clue.id,
           userId,
-          displayName: displayName(parsed.data.displayName, "Solver"),
+          displayName: profile.publicId,
         })
         .onConflictDoNothing({
           target: [solverProgressTable.clueId, solverProgressTable.userId],
@@ -369,7 +462,7 @@ router.post(
         .update(solverProgressTable)
         .set({
           attemptsUsed,
-          displayName: displayName(parsed.data.displayName, progress.displayName),
+          displayName: profile.publicId,
           solvedAt: correct ? now : null,
           failedAt: !correct && completed ? now : null,
           elapsedSeconds: completed ? elapsedSeconds : null,
@@ -394,8 +487,68 @@ router.post(
   },
 );
 
+router.get("/me/profile", requireAuth, async (req, res): Promise<void> => {
+  const profile = await ensureProfile(getAuth(req).userId!);
+  res.json(GetMyProfileResponse.parse(publicProfileResponse(profile)));
+});
+
+router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {
+  const parsed = UpdateMyProfileBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  const existing = await ensureProfile(userId);
+  const requestedId = parsed.data.publicId?.trim();
+  if (requestedId && !/^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/.test(requestedId)) {
+    res.status(400).json({
+      error: "Use 3–24 letters, numbers, underscores, or hyphens for your public ID.",
+    });
+    return;
+  }
+
+  const publicId = requestedId || existing.publicId;
+  const isGuest = requestedId ? false : existing.isGuest;
+  try {
+    const updated = await db.transaction(async (tx) => {
+      const [profile] = await tx
+        .update(userProfilesTable)
+        .set({
+          publicId,
+          normalizedPublicId: publicId.toLowerCase(),
+          isGuest,
+          onboardingComplete: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(userProfilesTable.userId, userId))
+        .returning();
+      if (!profile) throw new Error("Profile disappeared while being updated.");
+
+      await tx
+        .update(cluesTable)
+        .set({ setterName: profile.publicId })
+        .where(eq(cluesTable.setterUserId, userId));
+      await tx
+        .update(solverProgressTable)
+        .set({ displayName: profile.publicId })
+        .where(eq(solverProgressTable.userId, userId));
+      return profile;
+    });
+    res.json(UpdateMyProfileResponse.parse(publicProfileResponse(updated)));
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      res.status(409).json({ error: "That public ID is already in use. Try another one." });
+      return;
+    }
+    throw error;
+  }
+});
+
 router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
   const userId = getAuth(req).userId!;
+  const profile = await ensureProfile(userId);
   const [createdRow] = await db
     .select({ total: count() })
     .from(cluesTable)
@@ -422,7 +575,7 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
     clue: clue.clue,
     answerLength: normalizeAnswer(clue.answer).length,
     maxAttempts: clue.maxAttempts,
-    setterName: clue.setterName,
+    setterName: profile.publicId,
     solveCount: counts.get(clue.id) ?? 0,
     createdAt: clue.createdAt,
   }));

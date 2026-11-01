@@ -15,3 +15,5 @@ export * from './clueSummary';
 export * from './dashboard';
 export * from './healthStatus';
 export * from './leaderboardEntry';
+export * from './profileInput';
+export * from './publicProfile';

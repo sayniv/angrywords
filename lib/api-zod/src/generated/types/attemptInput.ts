@@ -12,6 +12,4 @@ export interface AttemptInput {
      * @maxLength 80
      */
   answer: string;
-  /** @maxLength 48 */
-  displayName?: string;
 }

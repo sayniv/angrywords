@@ -19,3 +19,4 @@
 
 export * from "./clues";
 export * from "./solver-progress";
+export * from "./user-profiles";

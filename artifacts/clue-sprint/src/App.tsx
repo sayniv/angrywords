@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
-  getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
-  useGetMyDashboard, useListClues, useStartClue, useSubmitAttempt,
+  getGetMyProfileQueryKey, getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
+  useGetMyDashboard, useGetMyProfile, useListClues, useStartClue, useSubmitAttempt,
+  useUpdateMyProfile,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -121,15 +122,17 @@ function ClerkRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <ClerkCacheSync />
-      <Switch>
-        <Route path="/" component={HomeRedirect} />
-        <Route path="/sign-in/*?" component={SignInPage} />
-        <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route path="/create" component={CreateGate} />
-        <Route path="/clue/:slug" component={ChallengePage} />
-        <Route path="/dashboard" component={DashboardGate} />
-        <Route component={NotFound} />
-      </Switch>
+      <ProfileGate>
+        <Switch>
+          <Route path="/" component={HomeRedirect} />
+          <Route path="/sign-in/*?" component={SignInPage} />
+          <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/create" component={CreateGate} />
+          <Route path="/clue/:slug" component={ChallengePage} />
+          <Route path="/dashboard" component={DashboardGate} />
+          <Route component={NotFound} />
+        </Switch>
+      </ProfileGate>
     </ClerkProvider>
   );
 }
@@ -164,6 +167,89 @@ function Protected({ children }: { children: ReactNode }) {
   if (!isLoaded) return <PageSkeleton />;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
   return <>{children}</>;
+}
+
+function ProfileGate({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useUser();
+  const profile = useGetMyProfile({
+    query: { queryKey: getGetMyProfileQueryKey(), enabled: Boolean(isLoaded && isSignedIn) },
+  });
+  if (!isLoaded) return <PageSkeleton />;
+  if (!isSignedIn) return <>{children}</>;
+  if (profile.isLoading) return <PageSkeleton />;
+  if (profile.isError || !profile.data) {
+    return (
+      <main className="page-wrap page-content">
+        <div className="state-panel">
+          <h2>Your profile could not load.</h2>
+          <p>Try again to continue to your clues.</p>
+          <button className="button button-outline" onClick={() => void profile.refetch()}>
+            Retry <RotateCcw size={15} />
+          </button>
+        </div>
+      </main>
+    );
+  }
+  if (profile.data.needsSetup) return <ProfileSetupPage profile={profile.data} />;
+  return <>{children}</>;
+}
+
+function ProfileSetupPage({ profile }: { profile: { publicId: string; isGuest: boolean; needsSetup: boolean } }) {
+  const cache = useQueryClient();
+  const updateProfile = useUpdateMyProfile();
+  const [publicId, setPublicId] = useState('');
+  const [error, setError] = useState('');
+  const finishSetup = async (nextId?: string) => {
+    setError('');
+    try {
+      await updateProfile.mutateAsync({ data: nextId ? { publicId: nextId.trim() } : {} });
+      await cache.invalidateQueries();
+    } catch (cause) {
+      const status = (cause as { status?: number }).status;
+      setError(status === 409
+        ? 'That ID is already taken. Choose another one.'
+        : 'We could not save your public ID. Please try again.');
+    }
+  };
+  return (
+    <main className="page-wrap profile-setup-page">
+      <div className="profile-setup-brand"><Brand /></div>
+      <section className="paper-form profile-setup-card">
+        <div className="eyebrow"><span className="eyebrow-dot" /> YOUR PUBLIC ID</div>
+        <h1 className="page-title">Choose how<br /><em>you show up.</em></h1>
+        <p className="profile-setup-copy">
+          Your ID is the only name shown on clues and leaderboards. Your real name and email stay private.
+        </p>
+        <form onSubmit={(event) => { event.preventDefault(); void finishSetup(publicId); }}>
+          <label className="field-label" htmlFor="public-id">Public ID</label>
+          <input
+            id="public-id"
+            className="public-id-input"
+            value={publicId}
+            onChange={(event) => setPublicId(event.target.value)}
+            placeholder="e.g. WordWiz27"
+            minLength={3}
+            maxLength={24}
+            pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,23}"
+            autoComplete="nickname"
+            required
+          />
+          <p className="profile-id-hint">3–24 letters, numbers, underscores, or hyphens. Avoid your real name or email.</p>
+          {error && <div className="form-error" role="alert"><X size={16} />{error}</div>}
+          <button className="button button-primary profile-save-button" type="submit" disabled={updateProfile.isPending}>
+            {updateProfile.isPending ? 'Saving your ID…' : 'Use this public ID'} <ArrowRight size={16} />
+          </button>
+        </form>
+        <div className="profile-divider"><span>OR</span></div>
+        <div className="guest-id-choice">
+          <div><span className="form-index">AUTO-GENERATED ID</span><strong>{profile.publicId}</strong><p>Keep this unique guest number instead.</p></div>
+          <button className="button button-outline" type="button" disabled={updateProfile.isPending} onClick={() => void finishSetup()}>
+            Continue as guest
+          </button>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function CreateGate() { return <Protected><CreatePage /></Protected>; }
@@ -217,6 +303,9 @@ function Brand({ compact = false }: { compact?: boolean }) {
 
 function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' }) {
   const { isSignedIn } = useUser();
+  const { data: profile } = useGetMyProfile({
+    query: { queryKey: getGetMyProfileQueryKey(), enabled: Boolean(isSignedIn) },
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const { signOut } = useClerk();
   return (
@@ -230,6 +319,7 @@ function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' }) {
         <div className="hidden items-center gap-3 md:flex">
           {isSignedIn ? (
             <>
+              <span className="header-public-id" title="Your public ID">{profile?.publicId}</span>
               <Link href="/create" className="button button-primary button-small"><PenLine size={15} /> Set a clue</Link>
               <button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => signOut({ redirectUrl: basePath || '/' })}><LockKeyhole size={17} /></button>
             </>
@@ -339,7 +429,6 @@ function Step({ number, icon, title, text }: { number: string; icon: ReactNode; 
 function CreatePage() {
   const [, setLocation] = useLocation();
   const cache = useQueryClient();
-  const { user } = useUser();
   const createClue = useCreateClue();
   const [clue, setClue] = useState('');
   const [answer, setAnswer] = useState('');
@@ -357,7 +446,6 @@ function CreatePage() {
       const created = await createClue.mutateAsync({ data: {
         clue: clue.trim(), answer: normalizedAnswer.toUpperCase(),
         wordplay: wordplay.trim(), maxAttempts,
-         displayName: user?.fullName || user?.username || 'Setter',
       } });
       await Promise.all([
         cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
@@ -409,7 +497,7 @@ function ChallengePage() {
   const submitAttempt = useSubmitAttempt();
   const startClue = useStartClue();
   const cache = useQueryClient();
-  const { isLoaded: authLoaded, isSignedIn, user } = useUser();
+  const { isLoaded: authLoaded, isSignedIn } = useUser();
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<import('@workspace/api-client-react').AttemptResult | null>(null);
   const [copied, setCopied] = useState(false);
@@ -468,7 +556,7 @@ function ChallengePage() {
     try {
       const next = await submitAttempt.mutateAsync({
         slug,
-        data: { answer: answer.trim(), displayName: user?.fullName || user?.username || 'Solver' },
+        data: { answer: answer.trim() },
       });
       setResult(next);
       setAnswer('');
@@ -539,10 +627,10 @@ function useParamsSafe() { return useParams<{ slug: string }>(); }
 
 function DashboardPage() {
   const { data: dashboard, isLoading, isError, refetch } = useGetMyDashboard();
-  const { user } = useUser();
+  const { data: profile } = useGetMyProfile();
   return <><Header active="dashboard" /><main className="page-wrap dashboard-page">
     <div className="dash-welcome">
-      <div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR LITTLE CORNER</div><h1 className="page-title">Good to see you{user?.firstName ? `, ${user.firstName}` : ''}.</h1><p>Your clues, your solves, your ongoing case for being the clever one.</p></div>
+      <div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR LITTLE CORNER</div><h1 className="page-title">Good to see you, {profile?.publicId ?? 'solver'}.</h1><p>Your clues, your solves, your ongoing case for being the clever one.</p></div>
       <Link href="/create" className="button button-primary"><PenLine size={16} /> Set a new clue</Link>
     </div>
     {isLoading ? <DashboardSkeleton /> : isError || !dashboard ? <div className="state-panel"><h2>Your page is taking a moment.</h2><p>We couldn't fetch your puzzle notes just now.</p><button className="button button-outline" onClick={() => refetch()}>Refresh page <RotateCcw size={15} /></button></div> : <>

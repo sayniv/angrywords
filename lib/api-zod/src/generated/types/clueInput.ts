@@ -27,6 +27,4 @@ export interface ClueInput {
      * @maximum 10
      */
   maxAttempts: number;
-  /** @maxLength 48 */
-  displayName?: string;
 }

@@ -66,8 +66,6 @@ export interface ClueInput {
      * @maximum 10
      */
   maxAttempts: number;
-  /** @maxLength 48 */
-  displayName?: string;
 }
 
 export interface AttemptInput {
@@ -76,8 +74,6 @@ export interface AttemptInput {
      * @maxLength 80
      */
   answer: string;
-  /** @maxLength 48 */
-  displayName?: string;
 }
 
 export interface AttemptResult {
@@ -109,5 +105,20 @@ export interface Dashboard {
   created: number;
   solved: number;
   recentClues: ClueSummary[];
+}
+
+export interface PublicProfile {
+  publicId: string;
+  isGuest: boolean;
+  needsSetup: boolean;
+}
+
+export interface ProfileInput {
+  /**
+     * @minLength 3
+     * @maxLength 24
+     * @pattern ^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$
+     */
+  publicId?: string;
 }
 
