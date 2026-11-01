@@ -453,12 +453,11 @@ export function HomePage() {
               <div className="art-stamp">TODAY'S<br />BRAIN TICKLE</div>
               <div className="crossword-board">
                 {[
-                  ['B','R','A','I','N'], ['L','', 'R','', 'E'], ['O','W','D','P','A'], ['O','', 'E','', 'S'], ['M','I','N','D','Y'],
+                  ['B','R','A','I','N'], ['L','', 'R','', 'O'], ['O','W','D','P','R'], ['O','', 'E','', 'T'], ['M','A','R','C','H'],
                 ].flatMap((row, ri) => row.map((letter, ci) => <div className={`cross-cell ${letter ? '' : 'cross-cell-blank'} ${ri === 2 && ci === 2 ? 'cross-cell-center' : ''}`} key={`${ri}-${ci}`}>{letter}</div>))}
               </div>
               <div className="art-caption"><span className="caption-line" /> GET THE ANSWER. GET THE GLORY.</div>
               <span className="scribble scribble-one">?</span><span className="scribble scribble-two">!</span>
-              <div className="art-check">5<br /><small>TRIES</small></div>
             </div>
           </div>
           <div className="ticker"><div className="ticker-track"><span>Think sideways</span><Sparkles size={13} /><span>Race your friends</span><Sparkles size={13} /><span>Share the aha</span><Sparkles size={13} /><span>Think sideways</span><Sparkles size={13} /><span>Race your friends</span><Sparkles size={13} /><span>Share the aha</span><Sparkles size={13} /></div></div>

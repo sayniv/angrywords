@@ -477,8 +477,6 @@
 .scribble { position: absolute; color: var(--tomato); font: italic 62px var(--app-font-serif); }
 .scribble-one { top: 32px; right: 54px; transform: rotate(14deg); }
 .scribble-two { bottom: 66px; right: 66px; transform: rotate(-10deg); }
-.art-check { position: absolute; bottom: 37px; left: 47px; width: 56px; height: 56px; display: grid; align-content: center; justify-items: center; color: var(--ink); background: var(--gold); border-radius: 50%; font: 700 18px var(--app-font-mono); transform: rotate(-10deg); }
-.art-check small { font-size: 7px; letter-spacing: .08em; }
 .ticker { overflow: hidden; padding: 12px 0; color: #fff7eb; background: var(--sage); }
 .ticker-track { display: flex; align-items: center; justify-content: space-around; gap: 28px; min-width: 780px; font: 500 10px var(--app-font-mono); letter-spacing: .14em; text-transform: uppercase; }
 .ticker-track svg { color: var(--gold); }
@@ -841,7 +839,6 @@
   .crossword-board { grid-template-columns: repeat(5, 43px); grid-template-rows: repeat(5,43px); }
   .cross-cell { font-size: 18px; }
   .art-stamp { top: 26px; left: 25px; }
-  .art-check { bottom: 25px; left: 24px; }
   .scribble-one { right: 28px; top: 20px; }
   .scribble-two { right: 35px; bottom: 48px; }
   .ticker-track { justify-content: flex-start; gap: 23px; }
