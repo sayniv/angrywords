@@ -148,8 +148,8 @@ function ClerkRoutes() {
           <ProfileGate>
             <Switch>
               <Route path="/" component={HomeRedirect} />
-              <Route path="/explore" component={ExploreRoute} />
               <Route path="/explore/popular" component={PopularExploreRoute} />
+              <Route path="/explore" component={ExploreRoute} />
               <Route path="/sign-in/*?" component={SignInPage} />
               <Route path="/sign-up/*?" component={SignUpPage} />
               <Route path="/create" component={CreateGate} />
