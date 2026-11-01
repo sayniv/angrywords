@@ -6,7 +6,7 @@ import {
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import {
-  ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Check, Clock3, Copy,
+  ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Check, Clock3, Copy, Flag,
   Crown, Feather, Lightbulb, LockKeyhole, Menu, PenLine, RotateCcw, Sparkles,
   Star, Trash2, Trophy, X,
 } from 'lucide-react';
@@ -15,7 +15,7 @@ import {
   getGetMyProfileQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
   getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard,
-  useListClues, useRateClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
+  useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -428,7 +428,7 @@ function HomePage() {
   );
 }
 
-function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: string; answerLength: number; maxAttempts: number; setterName: string; setterBlurb?: string | null; solveCount: number; averageRating?: number | null; ratingCount?: number }; index: number }) {
+function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: string; answerLength: number; maxAttempts: number; setterName: string; setterBlurb?: string | null; solveCount: number; averageRating?: number | null; ratingCount?: number; isBlocked?: boolean }; index: number }) {
   return (
     <Link href={`/clue/${clue.slug}`} className={`clue-card reveal-up clue-card-${index % 3}`} data-testid={`card-clue-${clue.id}`}>
       <div className="card-meta"><span className="clue-number">CLUE NO. {String(clue.id).padStart(3, '0')}</span><span className="card-arrow"><ArrowUpRight size={17} /></span></div>
@@ -437,6 +437,7 @@ function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: str
       {clue.setterBlurb && <p className="setter-blurb-card" data-testid={`text-setter-blurb-${clue.id}`}>{clue.setterBlurb}</p>}
       <div className="card-footer"><span>by <strong>{clue.setterName}</strong></span><span className="solve-count"><Trophy size={14} /> {clue.solveCount} solved</span></div>
       <div className="card-rating" data-testid={`text-clue-rating-${clue.id}`}><Star size={13} fill="currentColor" /> {clue.averageRating == null ? 'Not rated yet' : `${clue.averageRating.toFixed(1)} · ${clue.ratingCount ?? 0} ratings`}</div>
+      {clue.isBlocked && <div className="clue-blocked-badge" data-testid={`badge-clue-blocked-${clue.id}`}><Flag size={13} /> Blocked after 100 reports</div>}
     </Link>
   );
 }
@@ -566,8 +567,11 @@ function ChallengePage() {
   const [retiredLocally, setRetiredLocally] = useState(false);
   const retireClue = useRetireClue();
   const rateClue = useRateClue();
+  const reportClue = useReportClue();
   const [ratingChoice, setRatingChoice] = useState(0);
   const [ratingError, setRatingError] = useState('');
+  const [reportNotice, setReportNotice] = useState('');
+  const [reportError, setReportError] = useState('');
   const [localElapsed, setLocalElapsed] = useState(0);
   const startRequested = useRef(false);
   useEffect(() => {
@@ -576,6 +580,8 @@ function ChallengePage() {
     setCopied(false);
     setRatingChoice(0);
     setRatingError('');
+    setReportNotice('');
+    setReportError('');
     startRequested.current = false;
   }, [slug]);
   useEffect(() => {
@@ -583,7 +589,10 @@ function ChallengePage() {
     startRequested.current = true;
     void startClue.mutateAsync({ slug })
       .then(() => cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }))
-      .catch(() => { startRequested.current = false; });
+      .catch((cause) => {
+        startRequested.current = false;
+        if (hasHttpStatus(cause, 410)) void cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
+      });
   }, [authLoaded, isSignedIn, clue?.id, clue?.isOwner, clue?.userCompleted, slug, startClue.mutateAsync, cache]);
   const persistedStart = startClue.data?.startedAt || clue?.userStartedAt;
   const startedAt = persistedStart ? new Date(persistedStart).getTime() : null;
@@ -648,6 +657,10 @@ function ChallengePage() {
         cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
       ]);
     } catch (cause) {
+      if (hasHttpStatus(cause, 410)) {
+        await cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
+        return;
+      }
       setResult({ correct: false, attemptsUsed: result?.attemptsUsed || 0, attemptsRemaining: result?.attemptsRemaining ?? clue.maxAttempts, completed: false, elapsedSeconds: 0, message: apiErrorMessage(cause, 'Your guess could not be sent. Please try again.') });
     }
   };
@@ -662,17 +675,49 @@ function ChallengePage() {
         cache.invalidateQueries({ queryKey: getGetSetterLeaderboardQueryKey() }),
       ]);
     } catch (cause) {
+      if (hasHttpStatus(cause, 410)) void cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
       setRatingChoice(0);
       setRatingError(apiErrorMessage(cause, 'Your rating could not be saved. Please try again.'));
     }
   };
+  const handleReport = async () => {
+    setReportNotice('');
+    setReportError('');
+    if (!authLoaded) return;
+    if (!isSignedIn) {
+      window.location.assign(`${basePath}/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    if (!clue || clue.isOwner || clue.userHasReported) return;
+    try {
+      const report = await reportClue.mutateAsync({ slug });
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getGetClueLeaderboardQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+      setReportNotice(report.blocked
+        ? 'This clue reached 100 reports and is now blocked.'
+        : report.alreadyReported
+          ? 'You have already reported this clue.'
+          : 'Thanks. Your report has been recorded.');
+    } catch (cause) {
+      if (hasHttpStatus(cause, 410)) void cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
+      setReportError(apiErrorMessage(cause, 'Your report could not be recorded. Please try again.'));
+    }
+  };
+  const errorStatus = (error as { status?: number } | null)?.status;
+  const blockedError = errorStatus === 410 && apiErrorMessage(error, '').toLowerCase().includes('blocked');
   return <><Header /><main className="page-wrap challenge-page">
     <Link href="/" className="back-link"><ArrowLeft size={15} /> All clues</Link>
+    {reportNotice && <div className="report-feedback" role="status" data-testid="status-report-success"><Flag size={15} /> {reportNotice}</div>}
+    {reportError && <div className="form-error" role="alert" data-testid="status-report-error"><X size={16} /> {reportError}</div>}
     {retiredLocally ? <div className="state-panel"><h2>Clue retired.</h2><p>It no longer accepts guesses. Existing attempts and leaderboard history have been preserved.</p><Link href="/dashboard" className="button button-outline">Back to your page <ArrowRight size={15} /></Link></div> :
-      isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>{(error as { status?: number } | null)?.status === 410 ? 'This clue has been retired.' : 'This clue has slipped away.'}</h2><p>{(error as { status?: number } | null)?.status === 410 ? 'The setter retired this challenge. Its old shared link is no longer active.' : 'It may have been moved, or the link may be mistyped.'}</p>{(error as { status?: number } | null)?.status === 410 ? <Link href="/" className="button button-outline">Browse current clues <ArrowRight size={15} /></Link> : <button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button>}</div> :
+      isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>{errorStatus === 410 ? blockedError ? 'This clue has been blocked.' : 'This clue has been retired.' : 'This clue has slipped away.'}</h2><p>{errorStatus === 410 ? blockedError ? 'It reached 100 community reports and is no longer available. Solve and rating history is preserved.' : 'The setter retired this challenge. Its old shared link is no longer active.' : 'It may have been moved, or the link may be mistyped.'}</p>{errorStatus === 410 ? <Link href="/" className="button button-outline">Browse current clues <ArrowRight size={15} /></Link> : <button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button>}</div> :
       <div className="challenge-layout">
         <section className="challenge-main">
-          <div className="challenge-overline"><span className="eyebrow-dot" /> A CLUE FROM {clue.setterName.toUpperCase()}<span className="challenge-date">{new Date(clue.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><button className="share-link-button" data-testid="button-copy-clue-link" onClick={copyChallengeLink} type="button"><Copy size={13} /> {copied ? 'Link copied' : 'Copy challenge link'}</button></div>
+          <div className="challenge-overline"><span className="eyebrow-dot" /> A CLUE FROM {clue.setterName.toUpperCase()}<span className="challenge-date">{new Date(clue.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><div className="challenge-actions"><button className="share-link-button" data-testid="button-copy-clue-link" onClick={copyChallengeLink} type="button"><Copy size={13} /> {copied ? 'Link copied' : 'Copy challenge link'}</button>{!clue.isOwner && <button className="share-link-button report-button" data-testid="button-report-clue" onClick={() => void handleReport()} type="button" disabled={!authLoaded || reportClue.isPending || clue.userHasReported}><Flag size={13} /> {reportClue.isPending ? 'Reporting…' : clue.userHasReported ? 'Reported' : 'Report'}</button>}</div></div>
           <div className="challenge-paper">
             <div className="challenge-paper-top"><span>THE DAILY TICKLE</span><span>NO. {String(clue.id).padStart(3, '0')}</span></div>
             <h1 className="challenge-clue" data-testid="text-challenge-clue">{clue.clue}</h1>
@@ -804,6 +849,15 @@ function apiErrorMessage(cause: unknown, fallback: string) {
     if (typeof candidate.message === 'string' && candidate.message.trim()) return candidate.message;
   }
   return fallback;
+}
+
+function hasHttpStatus(cause: unknown, status: number) {
+  return Boolean(
+    cause &&
+    typeof cause === 'object' &&
+    'status' in cause &&
+    (cause as { status?: unknown }).status === status,
+  );
 }
 
 function Footer() {

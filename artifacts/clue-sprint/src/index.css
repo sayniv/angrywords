@@ -537,8 +537,13 @@
 .challenge-layout { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(275px,.75fr); align-items: start; gap: 42px; }
 .challenge-overline { display: flex; align-items: center; gap: 9px; margin: 2px 0 16px; color: #8a7667; font: 500 10px var(--app-font-mono); letter-spacing: .1em; }
 .challenge-date { margin-left: auto; color: #9c8d7c; }
+.challenge-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .share-link-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 9px; color: var(--tomato); background: #fffdf8; border: 1px solid var(--line); border-radius: 5px; font: 500 9px var(--app-font-mono); letter-spacing: .02em; cursor: pointer; }
 .share-link-button:hover { border-color: var(--tomato); background: #fff8f0; }
+.share-link-button:disabled { opacity: .72; cursor: default; }
+.report-button:disabled { color: #7d7164; }
+.report-feedback { display: flex; align-items: center; gap: 8px; max-width: 760px; margin: 15px 0; padding: 11px 13px; color: #365c49; background: #e9ede2; border: 1px solid #cad5c3; border-radius: 5px; font-size: 12px; }
+.clue-blocked-badge { display: inline-flex; align-items: center; gap: 5px; margin-top: 9px; color: #a73c30; font: 500 9px var(--app-font-mono); letter-spacing: .04em; }
 .challenge-paper { position: relative; padding: 23px 31px 20px; background: #fffdf7; border: 1px solid #d8cdbb; box-shadow: 0 5px 0 #e1d7c8, 0 15px 30px #382c240b; }
 .challenge-paper::before, .challenge-paper::after { content: ''; position: absolute; top: 0; bottom: 0; width: 1px; background: #e9d9cb; }
 .challenge-paper::before { left: 16px; }.challenge-paper::after { right: 16px; }
@@ -766,6 +771,6 @@
   .review-actions .button { width: 100%; }
   .challenge-overline { flex-wrap: wrap; line-height: 1.5; }
   .challenge-date { margin-left: auto; }
-  .share-link-button { margin-left: auto; }
+  .challenge-actions { width: 100%; justify-content: flex-end; }
   .profile-blurb-form { padding: 19px 17px; }
 }

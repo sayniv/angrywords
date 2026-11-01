@@ -19,5 +19,6 @@ export interface ClueSummary {
   /** @nullable */
   averageRating: number | null;
   ratingCount: number;
+  isBlocked: boolean;
   createdAt: Date;
 }

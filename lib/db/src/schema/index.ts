@@ -18,6 +18,7 @@
 //   export type Post = typeof postsTable.$inferSelect;
 
 export * from "./clues";
+export * from "./clue-reports";
 export * from "./clue-ratings";
 export * from "./solver-progress";
 export * from "./user-profiles";

@@ -35,6 +35,7 @@ export const ListCluesResponseItem = zod.object({
   "solveCount": zod.number().int(),
   "averageRating": zod.number().nullable(),
   "ratingCount": zod.number().int(),
+  "isBlocked": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 export const ListCluesResponse = zod.array(ListCluesResponseItem)
@@ -73,6 +74,7 @@ export const CreateClueResponse = zod.object({
   "averageRating": zod.number().nullable(),
   "ratingCount": zod.number().int(),
   "userRating": zod.number().int().nullable(),
+  "userHasReported": zod.boolean(),
   "isOwner": zod.boolean().optional(),
   "createdAt": zod.coerce.date(),
   "userAttemptsUsed": zod.number().int().nullable(),
@@ -103,6 +105,7 @@ export const GetClueResponse = zod.object({
   "averageRating": zod.number().nullable(),
   "ratingCount": zod.number().int(),
   "userRating": zod.number().int().nullable(),
+  "userHasReported": zod.boolean(),
   "isOwner": zod.boolean().optional(),
   "createdAt": zod.coerce.date(),
   "userAttemptsUsed": zod.number().int().nullable(),
@@ -122,6 +125,21 @@ export const RetireClueParams = zod.object({
 })
 
 export const RetireClueResponse = zod.void()
+
+
+/**
+ * @summary Report a clue
+ */
+export const ReportClueParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const ReportClueResponse = zod.object({
+  "reportCount": zod.number().int(),
+  "threshold": zod.literal(100),
+  "blocked": zod.boolean(),
+  "alreadyReported": zod.boolean()
+})
 
 
 /**
@@ -245,6 +263,7 @@ export const GetMyDashboardResponse = zod.object({
   "solveCount": zod.number().int(),
   "averageRating": zod.number().nullable(),
   "ratingCount": zod.number().int(),
+  "isBlocked": zod.boolean(),
   "createdAt": zod.coerce.date()
 }))
 })

@@ -26,6 +26,7 @@ import type {
   ClueInput,
   ClueRatingInput,
   ClueRatingSummary,
+  ClueReportResult,
   ClueRetired,
   ClueStartResult,
   ClueSummary,
@@ -467,6 +468,80 @@ export const useRetireClue = <TError = ErrorType<void | ClueRetired>,
       return useMutation(getRetireClueMutationOptions(options));
     }
 
+export const getReportClueUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}/report`
+}
+
+/**
+ * @summary Report a clue
+ */
+export const reportClue = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<ClueReportResult> => {
+
+  return customFetch<ClueReportResult>(getReportClueUrl(slug),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportClueMutationKey = () => ['reportClue'] as const;
+
+export const getReportClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportClue>>, TError,ReportClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportClue>>, TError,ReportClueMutationVariables, TContext> => {
+
+const mutationKey = getReportClueMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportClue>>, ReportClueMutationVariables> = (props) => {
+          const {slug} = props ?? {};
+
+          return  reportClue(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportClueMutationResult = NonNullable<Awaited<ReturnType<typeof reportClue>>>
+
+    export type ReportClueMutationError = ErrorType<void | ClueRetired>
+    export type ReportClueMutationVariables = {slug: string}
+
+    /**
+ * @summary Report a clue
+ */
+export const useReportClue = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportClue>>, TError,ReportClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportClue>>,
+        TError,
+        ReportClueMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReportClueMutationOptions(options));
+    }
+
 export const getRateClueUrl = (slug: string,) => {
 
 
@@ -510,7 +585,7 @@ return customFetch<ClueRatingSummary>(getRateClueUrl(slug),
 
 export const getRateClueMutationKey = () => ['rateClue'] as const;
 
-export const getRateClueMutationOptions = <TError = ErrorType<void>,
+export const getRateClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rateClue>>, TError,RateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof rateClue>>, TError,RateClueMutationVariables, TContext> => {
 
@@ -539,13 +614,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type RateClueMutationResult = NonNullable<Awaited<ReturnType<typeof rateClue>>>
     export type RateClueMutationBody = BodyType<ClueRatingInput>
-    export type RateClueMutationError = ErrorType<void>
+    export type RateClueMutationError = ErrorType<void | ClueRetired>
     export type RateClueMutationVariables = {slug: string;data: BodyType<ClueRatingInput>}
 
     /**
  * @summary Rate a clue after solving it
  */
-export const useRateClue = <TError = ErrorType<void>,
+export const useRateClue = <TError = ErrorType<void | ClueRetired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rateClue>>, TError,RateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof rateClue>>,

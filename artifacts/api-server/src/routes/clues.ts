@@ -24,11 +24,14 @@ import {
   RateClueBody,
   RateClueParams,
   RateClueResponse,
+  ReportClueParams,
+  ReportClueResponse,
   UpdateMyProfileBody,
   UpdateMyProfileResponse,
 } from "@workspace/api-zod";
 import {
   db,
+  clueReportsTable,
   clueRatingsTable,
   cluesTable,
   solverProgressTable,
@@ -37,6 +40,7 @@ import {
 import { containsObjectionableLanguage } from "../lib/content-moderation";
 
 const router: IRouter = Router();
+const CLUE_REPORT_BLOCK_THRESHOLD = 100;
 const requireAuth: RequestHandler = (req, res, next) => {
   if (!getAuth(req).userId) {
     res.status(401).json({ error: "Sign in to continue." });
@@ -199,13 +203,14 @@ router.get("/clues", async (req, res): Promise<void> => {
       maxAttempts: cluesTable.maxAttempts,
       setterUserId: cluesTable.setterUserId,
       setterName: cluesTable.setterName,
+      blockedAt: cluesTable.blockedAt,
       createdAt: cluesTable.createdAt,
       averageRating: ratings.averageRating,
       ratingCount: ratings.ratingCount,
     })
     .from(cluesTable)
     .leftJoin(ratings, eq(ratings.clueId, cluesTable.id))
-    .where(isNull(cluesTable.retiredAt))
+    .where(and(isNull(cluesTable.retiredAt), isNull(cluesTable.blockedAt)))
     .orderBy(
       ...(sortByRating
         ? [
@@ -229,6 +234,7 @@ router.get("/clues", async (req, res): Promise<void> => {
     solveCount: counts.get(clue.id) ?? 0,
     averageRating: clue.averageRating === null ? null : Number(clue.averageRating),
     ratingCount: Number(clue.ratingCount ?? 0),
+    isBlocked: Boolean(clue.blockedAt),
     createdAt: clue.createdAt,
   }));
   res.json(ListCluesResponse.parse(response));
@@ -289,6 +295,7 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
     averageRating: null,
     ratingCount: 0,
     userRating: null,
+    userHasReported: false,
     isOwner: true,
     createdAt: clue.createdAt,
     userAttemptsUsed: null,
@@ -365,6 +372,12 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     res.status(410).json({ error: "This clue has been retired by its setter." });
     return;
   }
+  if (clue.blockedAt) {
+    res.status(410).json({
+      error: "This clue has been blocked after reaching 100 community reports.",
+    });
+    return;
+  }
 
   const userId = getAuth(req).userId;
   const setterProfile =
@@ -407,6 +420,18 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
         )
         .limit(1)
     : [];
+  const [userReportRow] = userId
+    ? await db
+        .select({ id: clueReportsTable.id })
+        .from(clueReportsTable)
+        .where(
+          and(
+            eq(clueReportsTable.clueId, clue.id),
+            eq(clueReportsTable.userId, userId),
+          ),
+        )
+        .limit(1)
+    : [];
 
   const response = {
     id: clue.id,
@@ -424,6 +449,7 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
       ratingStats?.averageRating == null ? null : Number(ratingStats.averageRating),
     ratingCount: Number(ratingStats?.ratingCount ?? 0),
     userRating: userRatingRow?.rating ?? null,
+    userHasReported: Boolean(userReportRow),
     isOwner: clue.setterUserId === userId,
     createdAt: clue.createdAt,
     userAttemptsUsed: progress?.attemptsUsed ?? null,
@@ -439,6 +465,72 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
   res.json(GetClueResponse.parse(response));
 });
 
+router.post("/clues/:slug/report", requireAuth, async (req, res): Promise<void> => {
+  const params = ReportClueParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const userId = getAuth(req).userId!;
+  const result = await db.transaction(async (tx) => {
+    const [clue] = await tx
+      .select({
+        id: cluesTable.id,
+        setterUserId: cluesTable.setterUserId,
+        retiredAt: cluesTable.retiredAt,
+        blockedAt: cluesTable.blockedAt,
+      })
+      .from(cluesTable)
+      .where(eq(cluesTable.slug, params.data.slug))
+      .for("update")
+      .limit(1);
+    if (!clue) {
+      return { status: 404 as const, error: "Clue not found." };
+    }
+    if (clue.retiredAt) {
+      return { status: 410 as const, error: "This clue has been retired by its setter." };
+    }
+    if (clue.blockedAt) {
+      return { status: 410 as const, error: "This clue has already been blocked." };
+    }
+    if (clue.setterUserId === userId) {
+      return { status: 403 as const, error: "Setters cannot report their own clues." };
+    }
+
+    const [inserted] = await tx
+      .insert(clueReportsTable)
+      .values({ clueId: clue.id, userId })
+      .onConflictDoNothing({
+        target: [clueReportsTable.clueId, clueReportsTable.userId],
+      })
+      .returning({ id: clueReportsTable.id });
+    const [summary] = await tx
+      .select({ reportCount: count() })
+      .from(clueReportsTable)
+      .where(eq(clueReportsTable.clueId, clue.id));
+    const reportCount = Number(summary?.reportCount ?? 0);
+    const blocked = reportCount >= CLUE_REPORT_BLOCK_THRESHOLD;
+    if (blocked) {
+      await tx
+        .update(cluesTable)
+        .set({ blockedAt: new Date() })
+        .where(and(eq(cluesTable.id, clue.id), isNull(cluesTable.blockedAt)));
+    }
+    return {
+      status: 200 as const,
+      reportCount,
+      threshold: CLUE_REPORT_BLOCK_THRESHOLD,
+      blocked,
+      alreadyReported: !inserted,
+    };
+  });
+  if (result.status !== 200) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.json(ReportClueResponse.parse(result));
+});
+
 router.put("/clues/:slug/rating", requireAuth, async (req, res): Promise<void> => {
   const params = RateClueParams.safeParse(req.params);
   const parsed = RateClueBody.safeParse(req.body);
@@ -448,12 +540,25 @@ router.put("/clues/:slug/rating", requireAuth, async (req, res): Promise<void> =
   }
   const userId = getAuth(req).userId!;
   const [clue] = await db
-    .select({ id: cluesTable.id, setterUserId: cluesTable.setterUserId })
+    .select({
+      id: cluesTable.id,
+      setterUserId: cluesTable.setterUserId,
+      retiredAt: cluesTable.retiredAt,
+      blockedAt: cluesTable.blockedAt,
+    })
     .from(cluesTable)
     .where(eq(cluesTable.slug, params.data.slug))
     .limit(1);
   if (!clue) {
     res.status(404).json({ error: "Clue not found." });
+    return;
+  }
+  if (clue.retiredAt || clue.blockedAt) {
+    res.status(410).json({
+      error: clue.blockedAt
+        ? "This clue has been blocked after reaching 100 community reports."
+        : "This clue has been retired by its setter.",
+    });
     return;
   }
   if (clue.setterUserId === userId) {
@@ -510,7 +615,11 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
     return;
   }
   const [clue] = await db
-    .select({ id: cluesTable.id, retiredAt: cluesTable.retiredAt })
+    .select({
+      id: cluesTable.id,
+      retiredAt: cluesTable.retiredAt,
+      blockedAt: cluesTable.blockedAt,
+    })
     .from(cluesTable)
     .where(eq(cluesTable.slug, params.data.slug))
     .limit(1);
@@ -520,6 +629,12 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
   }
   if (clue.retiredAt) {
     res.status(410).json({ error: "This clue has been retired by its setter." });
+    return;
+  }
+  if (clue.blockedAt) {
+    res.status(410).json({
+      error: "This clue has been blocked after reaching 100 community reports.",
+    });
     return;
   }
   const rows = await db
@@ -576,6 +691,12 @@ router.post(
     }
     if (clue.retiredAt) {
       res.status(410).json({ error: "This clue has been retired by its setter." });
+      return;
+    }
+    if (clue.blockedAt) {
+      res.status(410).json({
+        error: "This clue has been blocked after reaching 100 community reports.",
+      });
       return;
     }
     const userId = getAuth(req).userId!;
@@ -650,6 +771,12 @@ router.post(
     }
     if (clue.retiredAt) {
       res.status(410).json({ error: "This clue has been retired by its setter." });
+      return;
+    }
+    if (clue.blockedAt) {
+      res.status(410).json({
+        error: "This clue has been blocked after reaching 100 community reports.",
+      });
       return;
     }
 
@@ -899,6 +1026,7 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
     solveCount: counts.get(clue.id) ?? 0,
     averageRating: ratings.get(clue.id)?.averageRating ?? null,
     ratingCount: ratings.get(clue.id)?.ratingCount ?? 0,
+    isBlocked: Boolean(clue.blockedAt),
     createdAt: clue.createdAt,
   }));
   res.json(

@@ -12,6 +12,8 @@ export * from './clue';
 export * from './clueInput';
 export * from './clueRatingInput';
 export * from './clueRatingSummary';
+export * from './clueReportResult';
+export * from './clueReportResultThreshold';
 export * from './clueRetired';
 export * from './clueStartResult';
 export * from './clueSummary';

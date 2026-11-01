@@ -22,6 +22,7 @@ export interface Clue {
   ratingCount: number;
   /** @nullable */
   userRating: number | null;
+  userHasReported: boolean;
   isOwner?: boolean;
   createdAt: Date;
   /** @nullable */

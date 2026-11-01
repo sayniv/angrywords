@@ -91,7 +91,7 @@ paths:
         "404":
           description: Clue not found
         "410":
-          description: Clue has been retired
+          description: Clue has been retired or blocked after community reports
           content:
             application/json:
               schema:
@@ -117,6 +117,38 @@ paths:
           description: Clue not found
         "410":
           description: Clue has already been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
+  /clues/{slug}/report:
+    post:
+      operationId: reportClue
+      tags: [clues]
+      summary: Report a clue
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Report recorded or already recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueReportResult"
+        "401":
+          description: Sign in to report a clue
+        "403":
+          description: Setters cannot report their own clue
+        "404":
+          description: Clue not found
+        "410":
+          description: Clue has been retired or blocked
           content:
             application/json:
               schema:
@@ -151,6 +183,12 @@ paths:
           description: Only a solver who completed the clue can rate it
         "404":
           description: Clue not found
+        "410":
+          description: Clue has been retired or blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /leaderboards/solvers:
     get:
       operationId: getSolverLeaderboard
@@ -200,7 +238,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
         "410":
-          description: Clue has been retired
+          description: Clue has been retired or blocked after community reports
           content:
             application/json:
               schema:
@@ -238,7 +276,7 @@ paths:
         "409":
           description: Complete public ID setup before solving
         "410":
-          description: Clue has been retired
+          description: Clue has been retired or blocked after community reports
           content:
             application/json:
               schema:
@@ -270,7 +308,7 @@ paths:
         "409":
           description: Complete public ID setup before solving
         "410":
-          description: Clue has been retired
+          description: Clue has been retired or blocked after community reports
           content:
             application/json:
               schema:
@@ -342,7 +380,7 @@ components:
         - status
     Clue:
       type: object
-      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer]
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, userHasReported, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -355,6 +393,7 @@ components:
         averageRating: { type: ["number", "null"] }
         ratingCount: { type: integer }
         userRating: { type: ["integer", "null"] }
+        userHasReported: { type: boolean }
         isOwner: { type: boolean }
         createdAt: { type: string, format: date-time }
         userAttemptsUsed: { type: ["integer", "null"] }
@@ -365,7 +404,7 @@ components:
         revealedAnswer: { type: ["string", "null"] }
     ClueSummary:
       type: object
-      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, solveCount, averageRating, ratingCount, createdAt]
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, solveCount, averageRating, ratingCount, isBlocked, createdAt]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -377,6 +416,7 @@ components:
         solveCount: { type: integer }
         averageRating: { type: ["number", "null"] }
         ratingCount: { type: integer }
+        isBlocked: { type: boolean }
         createdAt: { type: string, format: date-time }
     ClueInput:
       type: object
@@ -465,6 +505,14 @@ components:
         averageRating: { type: ["number", "null"] }
         ratingCount: { type: integer }
         userRating: { type: integer }
+    ClueReportResult:
+      type: object
+      required: [reportCount, threshold, blocked, alreadyReported]
+      properties:
+        reportCount: { type: integer }
+        threshold: { type: integer, enum: [100] }
+        blocked: { type: boolean }
+        alreadyReported: { type: boolean }
     SolverLeaderboardEntry:
       type: object
       required: [rank, displayName, averageSeconds, solvedCount]

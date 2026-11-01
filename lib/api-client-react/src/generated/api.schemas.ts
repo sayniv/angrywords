@@ -25,6 +25,7 @@ export interface Clue {
   ratingCount: number;
   /** @nullable */
   userRating: number | null;
+  userHasReported: boolean;
   isOwner?: boolean;
   createdAt: string;
   /** @nullable */
@@ -54,6 +55,7 @@ export interface ClueSummary {
   /** @nullable */
   averageRating: number | null;
   ratingCount: number;
+  isBlocked: boolean;
   createdAt: string;
 }
 
@@ -155,6 +157,20 @@ export interface ClueRatingSummary {
   averageRating: number | null;
   ratingCount: number;
   userRating: number;
+}
+
+export type ClueReportResultThreshold = typeof ClueReportResultThreshold[keyof typeof ClueReportResultThreshold];
+
+
+export const ClueReportResultThreshold = {
+  NUMBER_100: 100,
+} as const;
+
+export interface ClueReportResult {
+  reportCount: number;
+  threshold: ClueReportResultThreshold;
+  blocked: boolean;
+  alreadyReported: boolean;
 }
 
 export interface SolverLeaderboardEntry {

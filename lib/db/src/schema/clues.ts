@@ -14,6 +14,7 @@ export const cluesTable = pgTable("clues", {
   setterName: varchar("setter_name", { length: 48 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   retiredAt: timestamp("retired_at", { withTimezone: true }),
+  blockedAt: timestamp("blocked_at", { withTimezone: true }),
 });
 
 export const insertClueSchema = createInsertSchema(cluesTable).omit({
