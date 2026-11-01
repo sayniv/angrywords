@@ -736,6 +736,34 @@ describe('Race So Far medal tiers', () => {
     expect(screen.queryByTestId('text-own-solve-gold')).toBeNull();
   });
 
+  it('lets players reveal long solver names without changing short-name rows', async () => {
+    const longName = 'The exceptionally quick cryptic solver';
+    const view = renderClueLeaderboard('gold', 'gold', {
+      entries: [
+        { rank: 1, displayName: longName, elapsedSeconds: 63, attemptsUsed: 1, solvedAt: '2026-11-01T12:00:00Z' },
+        { rank: 2, displayName: 'Quick solver', elapsedSeconds: 81, attemptsUsed: 2, solvedAt: '2026-11-01T12:01:00Z' },
+      ],
+    });
+    const longRow = screen.getByTestId('row-leader-gold-1');
+    const disclosure = longRow.querySelector('summary');
+
+    expect(disclosure?.getAttribute('aria-label')).toBe(`Show full name: ${longName}`);
+    expect(disclosure?.querySelector('strong')?.textContent).toBe(longName);
+    expect(disclosure).toBeTruthy();
+    expect(within(screen.getByTestId('row-leader-gold-2')).queryByText('Quick solver')?.tagName).toBe('STRONG');
+    expect(within(screen.getByTestId('row-leader-gold-2')).queryByText('Quick solver')?.closest('details')).toBeNull();
+    expect(longRow.querySelector('.rank-badge')?.getAttribute('aria-label')).toBe('1st place');
+    expect(longRow.querySelector('.leader-time')?.textContent).toBe('1:03');
+
+    await userEvent.setup().click(disclosure!);
+
+    expect(longRow.querySelector('details')?.hasAttribute('open')).toBe(true);
+    expect(within(longRow).getByText(longName, { selector: '.leader-name-full' })).toBeTruthy();
+    expect(longRow.querySelector('.rank-badge')?.getAttribute('aria-label')).toBe('1st place');
+    expect(longRow.querySelector('.leader-time')?.textContent).toBe('1:03');
+    view.unmount();
+  });
+
   it('defines distinct section, heading, and rank colors for all three tiers', () => {
     const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
     for (const tier of ['gold', 'silver', 'bronze']) {
@@ -780,6 +808,8 @@ describe('Race So Far medal tiers', () => {
     expect(phoneRules).toContain('.clue-board-title > span { font-size: 10px; text-align: left; }');
     expect(phoneRules).toContain('.tier-rank-badge { width: 30px; height: 30px; }');
     expect(phoneRules).toContain('.leader-time { flex: 0 0 auto; font-size: 12px; white-space: nowrap; }');
+    expect(css).toContain('.leader-name-details > summary { display: flex; align-items: center; gap: 5px; cursor: pointer; list-style: none; }');
+    expect(css).toContain('.leader-name-full { display: block; max-width: 100%;');
     view.unmount();
   });
 

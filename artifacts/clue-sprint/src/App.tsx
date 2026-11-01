@@ -650,7 +650,10 @@ export function ClueLeaderboardSection({ tier, description, category, entries, l
           <span className={`rank-badge rank-${entry.rank} tier-rank-badge`} aria-label={`${entry.rank}${entry.rank === 1 ? 'st' : entry.rank === 2 ? 'nd' : entry.rank === 3 ? 'rd' : 'th'} place`}>
             {entry.rank === 1 ? <TierWinnerIcon tier={tier} /> : String(entry.rank).padStart(2, '0')}
           </span>
-          <div className="leader-person"><div className="leader-name"><strong>{entry.displayName}</strong>{entry.isCurrentUser && <span className="leader-you" aria-label="Your solve" data-testid={`text-own-solve-${category}`}>You</span>}</div><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
+          <div className="leader-person"><div className="leader-name">{entry.displayName.length > 18 ? <details className="leader-name-details">
+            <summary aria-label={`Show full name: ${entry.displayName}`}><strong>{entry.displayName}</strong></summary>
+            <span className="leader-name-full">{entry.displayName}</span>
+          </details> : <strong>{entry.displayName}</strong>}{entry.isCurrentUser && <span className="leader-you" aria-label="Your solve" data-testid={`text-own-solve-${category}`}>You</span>}</div><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
           <span className="leader-time">{formatTime(entry.elapsedSeconds)}</span>
         </li>)}
       </ol>
