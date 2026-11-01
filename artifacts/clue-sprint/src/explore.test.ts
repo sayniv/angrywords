@@ -131,7 +131,7 @@ function challengeClue(id: number) {
 }
 
 function setupClueQuery(overrides: Record<string, unknown> = {}) {
-  const fetchNextPage = vi.fn();
+  const fetchNextPage = vi.fn().mockResolvedValue({ isError: false, data: { pages: [] } });
   const refetch = vi.fn();
   api.infiniteQuery.mockReturnValue({
     data: undefined,
@@ -309,15 +309,17 @@ describe('Home and Explore destinations', () => {
     expect(screen.getByTestId('link-explore-after-solve').getAttribute('href')).toBe('/explore');
   });
 
-  it('renders the first clue page and keeps cards linked to their challenges', () => {
-    const clues = Array.from({ length: 24 }, (_, index) => clue(index + 1));
+  it('renders at most twenty compact clues per page and keeps cards linked to challenges', () => {
+    const clues = Array.from({ length: 20 }, (_, index) => clue(index + 1));
     setupClueQuery({ data: { pages: [{ items: clues, nextCursor: 'next-page' }] }, hasNextPage: true });
 
     renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
 
-    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(24);
-    expect(screen.getByTestId('card-clue-24').getAttribute('href')).toBe('/clue/clue-24');
-    expect(screen.getByTestId('button-load-more-clues')).toBeTruthy();
+    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(20);
+    expect(screen.getByTestId('card-clue-20').getAttribute('href')).toBe('/clue/clue-20');
+    expect(screen.getByTestId('card-clue-20').className).toContain('clue-card-compact');
+    expect(screen.getByTestId('button-previous-clues').hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTestId('button-next-clues')).toBeTruthy();
     expect(api.infiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
       queryKey: ['clues', { sort: 'newest' }],
       initialPageParam: null,
@@ -325,30 +327,55 @@ describe('Home and Explore destinations', () => {
     }));
   });
 
-  it('appends later pages without losing earlier clues and allows retrying a failed next page', async () => {
-    const { fetchNextPage } = setupClueQuery({
-      data: { pages: [{ items: [clue(2), clue(1)], nextCursor: 'next-page' }, { items: [clue(3)], nextCursor: null }] },
-      hasNextPage: true,
-      isFetchNextPageError: true,
+  it('keeps compact clue rows and page controls usable on narrow screens and with a keyboard', () => {
+    setupClueQuery({ data: { pages: [{ items: [clue(1)], nextCursor: 'next-page' }] }, hasNextPage: true });
+    renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
+
+    const card = screen.getByTestId('card-clue-1');
+    expect(card.tagName).toBe('A');
+    expect(card.className).toContain('clue-card-compact');
+    expect(screen.getByRole('navigation', { name: 'Clue catalog pages' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Next/ }).tagName).toBe('BUTTON');
+
+    const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
+    const phoneRules = css.match(/@media \(max-width: 600px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(css).toContain('.clue-card-compact:focus-visible');
+    expect(phoneRules).toContain('.clue-card-compact { grid-template-columns: minmax(0, 1fr);');
+    expect(phoneRules).toContain('.catalog-pagination .button { flex: 1 1 auto;');
+  });
+
+  it('moves between already-loaded pages without duplicating clues or losing page position', async () => {
+    setupClueQuery({
+      data: { pages: [
+        { items: [clue(20), clue(19)], nextCursor: 'page-two' },
+        { items: [clue(18), clue(17)], nextCursor: null },
+      ] },
     });
 
     renderWithRouter(createElement(ExplorePage, { sort: 'rating' }));
 
     expect(screen.getByTestId('link-highest-rated').getAttribute('href')).toBe('/explore/popular');
     expect(screen.getByTestId('link-highest-rated').getAttribute('aria-current')).toBe('page');
-    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(3);
-    expect(screen.getByTestId('card-clue-2')).toBeTruthy();
-    expect(screen.getByTestId('card-clue-1')).toBeTruthy();
-    expect(screen.getByTestId('card-clue-3')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toContain('Your place is saved');
-    expect(screen.getByTestId('button-load-more-clues').textContent).toContain('Try again');
+    expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
+      .toEqual(['card-clue-20', 'card-clue-19']);
 
-    await userEvent.setup().click(screen.getByTestId('button-load-more-clues'));
-    expect(fetchNextPage).toHaveBeenCalledOnce();
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId('button-next-clues'));
+    expect(screen.getByTestId('text-clue-page').textContent).toBe('Page 2');
+    expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
+      .toEqual(['card-clue-18', 'card-clue-17']);
+
+    await user.click(screen.getByTestId('button-previous-clues'));
+    expect(screen.getByTestId('text-clue-page').textContent).toBe('Page 1');
+    expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
+      .toEqual(['card-clue-20', 'card-clue-19']);
   });
 
-  it('uses the latest page cursor when requesting more playable clues', async () => {
-    setupClueQuery({ data: { pages: [{ items: [clue(2)], nextCursor: 'after-clue-2' }] }, hasNextPage: true });
+  it('requests the next cursor when the user advances beyond loaded pages', async () => {
+    const { fetchNextPage } = setupClueQuery({
+      data: { pages: [{ items: [clue(2)], nextCursor: 'after-clue-2' }] },
+      hasNextPage: true,
+    });
     api.listClues.mockResolvedValue({ items: [clue(1)], nextCursor: null });
 
     renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
@@ -367,9 +394,24 @@ describe('Home and Explore destinations', () => {
       { sort: 'newest', cursor: 'after-clue-2' },
       { signal },
     );
-    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(1);
+    await userEvent.setup().click(screen.getByTestId('button-next-clues'));
+    expect(fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the current page visible and offers retry after a next-page failure', async () => {
+    const { fetchNextPage } = setupClueQuery({
+      data: { pages: [{ items: [clue(2)], nextCursor: 'after-clue-2' }] },
+      hasNextPage: true,
+      isFetchNextPageError: true,
+    });
+
+    renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
+
     expect(screen.getByTestId('card-clue-2')).toBeTruthy();
-    expect(screen.queryByTestId('card-clue-1')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('Your place is saved');
+    expect(screen.getByTestId('button-next-clues').textContent).toContain('Try again');
+    await userEvent.setup().click(screen.getByTestId('button-next-clues'));
+    expect(fetchNextPage).toHaveBeenCalledOnce();
   });
 
   it('preserves loading and empty catalog states', () => {
@@ -410,7 +452,7 @@ describe('Home and Explore destinations', () => {
     }));
   });
 
-  it('preserves API order for equally rated clues and consistently places unrated clues last', () => {
+  it('preserves API order for equally rated clues and consistently places unrated clues last', async () => {
     const sameDate = '2026-11-01T12:00:00.000Z';
     const ratedHighId = { ...clue(40), averageRating: 4.5, ratingCount: 5, createdAt: sameDate };
     const ratedLowId = { ...clue(30), averageRating: 4.5, ratingCount: 5, createdAt: sameDate };
@@ -430,14 +472,10 @@ describe('Home and Explore destinations', () => {
     renderAppAt('/explore/popular');
 
     expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
-      .toEqual([
-        'card-clue-40',
-        'card-clue-30',
-        'card-clue-50',
-        'card-clue-70',
-        'card-clue-55',
-        'card-clue-54',
-      ]);
+      .toEqual(['card-clue-40', 'card-clue-30']);
+    await userEvent.setup().click(screen.getByTestId('button-next-clues'));
+    expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
+      .toEqual(['card-clue-50', 'card-clue-70', 'card-clue-55', 'card-clue-54']);
     expect(screen.getByTestId('text-clue-rating-70').textContent).toContain('Not rated yet');
     expect(screen.getByTestId('text-clue-rating-55').textContent).toContain('Not rated yet');
     expect(api.infiniteQuery).toHaveBeenCalledWith(expect.objectContaining({

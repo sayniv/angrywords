@@ -487,10 +487,20 @@
 .section-title { margin: 12px 0 0; color: var(--ink); font: 600 clamp(34px,4.4vw,52px)/1.05 var(--app-font-serif); letter-spacing: -.055em; }
 .section-aside { margin-bottom: 4px; color: #82766a; font-size: 12px; line-height: 1.8; }
 .clue-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 17px; }
+.explore-clue-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .clue-card { display: flex; flex-direction: column; min-height: 244px; padding: 21px 21px 18px; color: var(--ink); background: #fffdf8; border: 1px solid var(--line); border-radius: 5px; text-decoration: none; transition: transform .2s, box-shadow .2s, border-color .2s; }
 .clue-card:hover { transform: translateY(-4px); border-color: #d5b9a5; box-shadow: 0 6px 0 #e5d8c8, 0 17px 28px #382c2410; }
 .clue-card-1 { background: #f8f1e5; }
 .clue-card-2 { background: #f5f5e9; }
+.clue-card-compact { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "meta meta" "clue clue" "answer answer" "blurb blurb" "footer rating"; align-items: center; gap: 7px 14px; min-height: 0; padding: 13px 17px; }
+.clue-card-compact .card-meta { grid-area: meta; }
+.clue-card-compact .card-clue-text { grid-area: clue; margin: 2px 0 1px; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+.clue-card-compact .answer-slots { grid-area: answer; }
+.clue-card-compact .setter-blurb-card { grid-area: blurb; margin: 0; }
+.clue-card-compact .card-footer { grid-area: footer; justify-content: flex-start; flex-wrap: wrap; gap: 4px 16px; margin-top: 1px; font-size: 10px; }
+.clue-card-compact .card-rating { grid-area: rating; justify-content: flex-end; margin-top: 0; white-space: nowrap; }
+.clue-card-compact .clue-blocked-badge { grid-column: 1 / -1; }
+.clue-card-compact:focus-visible { outline: 3px solid var(--tomato); outline-offset: 3px; }
 .card-meta, .card-footer { display: flex; align-items: center; justify-content: space-between; }
 .clue-number, .form-index { color: #938272; font: 500 9px var(--app-font-mono); letter-spacing: .12em; }
 .card-arrow { display: grid; place-items: center; width: 29px; height: 29px; color: var(--tomato); border: 1px solid #decfc0; border-radius: 50%; }
@@ -757,7 +767,11 @@
 .activity-empty > svg { flex: 0 0 auto; color: var(--tomato); }
 .activity-empty .text-link { margin-left: auto; }
 .activity-load-more { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin: -36px 0 58px; }
-.catalog-load-more { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 28px 0 52px; }
+.catalog-pagination { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 28px 0 52px; }
+.catalog-pagination .button { min-height: 42px; }
+.catalog-pagination .button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
+.catalog-page-number { min-width: 68px; color: #75685e; font: 10px var(--app-font-mono); text-align: center; }
+.catalog-pagination .activity-load-error { flex-basis: 100%; margin: 0; text-align: center; }
 .activity-load-error { color: #a43e34; font-size: 12px; }
 .dash-empty { margin-bottom: 18px; }
 .dash-note { display: flex; align-items: center; gap: 11px; margin-top: 27px; padding: 17px; color: #827566; background: #f1ecdf; border: 1px solid #e4d9c9; border-radius: 6px; font-size: 11px; }
@@ -835,10 +849,15 @@
   .section-topline { align-items: start; flex-direction: column; gap: 10px; }
   .section-aside { margin: 0; }
   .clue-grid, .dashboard-grid { grid-template-columns: 1fr; }
+  .clue-card-compact { grid-template-columns: minmax(0, 1fr); grid-template-areas: "meta" "clue" "answer" "blurb" "footer" "rating"; }
+  .clue-card-compact .card-rating { justify-content: flex-start; }
+  .catalog-pagination { gap: 8px; }
+  .catalog-pagination .button { flex: 1 1 auto; padding-inline: 12px; }
   .activity-grid { grid-template-columns: 1fr; margin-bottom: 44px; }
   .activity-empty { align-items: flex-start; flex-wrap: wrap; margin-bottom: 44px; }
   .activity-empty .text-link { margin-left: 30px; }
   .clue-card { min-height: 215px; }
+  .clue-card.clue-card-compact { min-height: 0; }
   .bottom-invite { align-items: flex-start; flex-wrap: wrap; }
   .bottom-invite a { width: calc(100% - 28px); margin-left: 28px; }
   .empty-clues { align-items: flex-start; flex-wrap: wrap; padding: 19px; }

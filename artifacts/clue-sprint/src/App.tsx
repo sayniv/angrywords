@@ -490,6 +490,7 @@ export function HomePage() {
 }
 
 export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
+  const [pageIndices, setPageIndices] = useState({ newest: 0, rating: 0 });
   const cluesQuery = useInfiniteQuery({
     queryKey: getListCluesQueryKey({ sort }),
     initialPageParam: null as string | null,
@@ -500,8 +501,27 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 15_000,
   });
-  // The API owns catalog ordering; flatten pages without re-sorting cursor results.
-  const clues = cluesQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  // The API owns catalog ordering; keep its cursor pages intact and show one at a time.
+  const pages = cluesQuery.data?.pages ?? [];
+  const pageIndex = Math.min(pageIndices[sort], Math.max(0, pages.length - 1));
+  const currentPage = pages[pageIndex];
+  const clues = currentPage?.items ?? [];
+  const setPageIndex = (index: number) => {
+    setPageIndices((current) => ({ ...current, [sort]: index }));
+  };
+  const goToNextPage = () => {
+    if (pageIndex < pages.length - 1) {
+      setPageIndex(pageIndex + 1);
+      return;
+    }
+    if (!cluesQuery.hasNextPage || cluesQuery.isFetchingNextPage) return;
+    void cluesQuery.fetchNextPage().then((result) => {
+      if (!result.isError && (result.data?.pages.length ?? 0) > pageIndex + 1) {
+        setPageIndex(pageIndex + 1);
+      }
+    });
+  };
+  const hasNextPage = pageIndex < pages.length - 1 || Boolean(cluesQuery.hasNextPage);
   const isPopular = sort === 'rating';
   return (
     <div className="min-h-[100dvh]">
@@ -528,8 +548,8 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
               <button className="button button-outline" type="button" data-testid="button-retry-clues" onClick={() => void cluesQuery.refetch()}>Try again <RotateCcw size={15} /></button>
             </div>
           ) : clues.length ? (
-            <div className="clue-grid" data-testid="list-playable-clues">
-              {clues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}
+            <div className="explore-clue-list" data-testid="list-playable-clues">
+              {clues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} compact />)}
             </div>
           ) : (
             <div className="empty-clues" data-testid="empty-playable-clues">
@@ -538,19 +558,31 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
               <Link href="/sign-up" className="button button-primary">Set the first clue <ArrowRight size={15} /></Link>
             </div>
           )}
-          {cluesQuery.hasNextPage && (
-            <div className="catalog-load-more">
-              {cluesQuery.isFetchNextPageError && <p className="activity-load-error" role="alert">More clues could not be loaded. Your place is saved; try again.</p>}
+          {(pageIndex > 0 || hasNextPage) && (
+            <nav className="catalog-pagination" aria-label="Clue catalog pages" data-testid="catalog-pagination">
               <button
                 className="button button-outline"
                 type="button"
-                data-testid="button-load-more-clues"
-                disabled={cluesQuery.isFetchingNextPage}
-                onClick={() => void cluesQuery.fetchNextPage()}
+                data-testid="button-previous-clues"
+                disabled={pageIndex === 0}
+                onClick={() => setPageIndex(Math.max(0, pageIndex - 1))}
               >
-                {cluesQuery.isFetchingNextPage ? 'Loading more clues…' : cluesQuery.isFetchNextPageError ? 'Try again' : 'Load more clues'} <ArrowDownRight size={15} />
+                <ArrowLeft size={15} /> Previous
               </button>
-            </div>
+              <span className="catalog-page-number" aria-live="polite" data-testid="text-clue-page">Page {pageIndex + 1}</span>
+              <button
+                className="button button-outline"
+                type="button"
+                data-testid="button-next-clues"
+                disabled={!hasNextPage || cluesQuery.isFetchingNextPage}
+                onClick={goToNextPage}
+              >
+                {cluesQuery.isFetchingNextPage ? 'Loading…' : cluesQuery.isFetchNextPageError && pageIndex === pages.length - 1 ? 'Try again' : 'Next'} <ArrowRight size={15} />
+              </button>
+              {cluesQuery.isFetchNextPageError && pageIndex === pages.length - 1 && (
+                <p className="activity-load-error" role="alert">The next page could not be loaded. Your place is saved; try again.</p>
+              )}
+            </nav>
           )}
           <div className="bottom-invite"><span className="invite-star"><Sparkles size={18} /></span><p>Have a clue rattling around in your head?</p><Link href="/sign-up">Bring it to the table <ArrowRight size={15} /></Link></div>
         </div>
@@ -560,9 +592,9 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
   );
 }
 
-function ClueCard({ clue, index }: { clue: { id: number; slug: string; clue: string; answerLength: number; maxAttempts: number; setterName: string; setterBlurb?: string | null; solveCount: number; averageRating?: number | null; ratingCount?: number; isBlocked?: boolean }; index: number }) {
+function ClueCard({ clue, index, compact = false }: { clue: { id: number; slug: string; clue: string; answerLength: number; maxAttempts: number; setterName: string; setterBlurb?: string | null; solveCount: number; averageRating?: number | null; ratingCount?: number; isBlocked?: boolean }; index: number; compact?: boolean }) {
   return (
-    <Link href={`/clue/${clue.slug}`} className={`clue-card reveal-up clue-card-${index % 3}`} data-testid={`card-clue-${clue.id}`}>
+    <Link href={`/clue/${clue.slug}`} className={`clue-card reveal-up clue-card-${index % 3}${compact ? ' clue-card-compact' : ''}`} data-testid={`card-clue-${clue.id}`}>
       <div className="card-meta"><span className="clue-number">CLUE NO. {String(clue.id).padStart(3, '0')}</span><span className="card-arrow"><ArrowUpRight size={17} /></span></div>
       <p className="card-clue-text">{clue.clue}</p>
       <div className="answer-slots">{Array.from({ length: Math.min(clue.answerLength, 12) }, (_, i) => <i key={i} />)}<span>{clue.answerLength} letters</span></div>

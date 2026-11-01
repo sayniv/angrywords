@@ -84,6 +84,7 @@ import { buildClueLeaderboardEntries } from "../lib/clue-leaderboard";
 import { getGuessFeedback } from "../lib/guess-feedback";
 
 import {
+  CLUE_LISTING_PAGE_SIZE,
   decodeClueListingCursor,
   encodeClueListingCursor,
   getClueRecommendationFilter,
@@ -96,7 +97,6 @@ import {
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
 const SOLVER_ACTIVITY_PAGE_SIZE = 10;
-const PUBLIC_CLUE_PAGE_SIZE = 24;
 const REVIEWER_USER_IDS = new Set(
   (process.env.CLUE_REVIEWER_USER_IDS ?? "")
     .split(",")
@@ -355,9 +355,9 @@ router.get("/clues", async (req, res): Promise<void> => {
       createdAt: cluesTable.createdAt,
       id: cluesTable.id,
     }))
-    .limit(PUBLIC_CLUE_PAGE_SIZE + 1);
-  const hasMore = pageRows.length > PUBLIC_CLUE_PAGE_SIZE;
-  const clues = pageRows.slice(0, PUBLIC_CLUE_PAGE_SIZE);
+    .limit(CLUE_LISTING_PAGE_SIZE + 1);
+  const hasMore = pageRows.length > CLUE_LISTING_PAGE_SIZE;
+  const clues = pageRows.slice(0, CLUE_LISTING_PAGE_SIZE);
   const counts = await solveCounts(clues.map((clue) => clue.id));
   const publicProfiles = await publicProfilesForUsers(clues.map((clue) => clue.setterUserId));
   const response = clues.map((clue) =>

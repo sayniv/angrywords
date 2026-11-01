@@ -3,6 +3,7 @@ import test from "node:test";
 import { sql } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import {
+  CLUE_LISTING_PAGE_SIZE,
   decodeClueListingCursor,
   encodeClueListingCursor,
   getClueRecommendationFilter,
@@ -22,6 +23,10 @@ const cursor: ClueListingCursor = {
   averageRating: "4.25",
   ratingCount: 8,
 };
+
+test("public clue catalog pages contain twenty clues", () => {
+  assert.equal(CLUE_LISTING_PAGE_SIZE, 20);
+});
 
 test("clue listing cursors preserve the sort tuple and reject malformed values", () => {
   const encoded = encodeClueListingCursor(cursor);

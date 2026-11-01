@@ -79,6 +79,8 @@ export function getClueRecommendationOrder(fields: {
   return getClueListingOrder(true, fields);
 }
 
+export const CLUE_LISTING_PAGE_SIZE = 20;
+
 export type ClueListingSort = "newest" | "rating";
 
 export type ClueListingCursor = {
