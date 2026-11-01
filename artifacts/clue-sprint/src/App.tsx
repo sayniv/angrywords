@@ -10,7 +10,7 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import {
   ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Check, Clock3, Copy, Flag,
-  Crown, Feather, Lightbulb, LockKeyhole, Menu, PenLine, RotateCcw, Sparkles,
+  Crown, Feather, Lightbulb, LockKeyhole, LogOut, Menu, PenLine, RotateCcw, Sparkles,
   Star, Trash2, Trophy, X,
 } from 'lucide-react';
 import {
@@ -26,6 +26,11 @@ import {
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -348,7 +353,32 @@ function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' | 'tuto
             <>
               <span className="header-public-id" title="Your public ID">{profile?.publicId}</span>
               <Link href="/create" className="button button-primary button-small"><PenLine size={15} /> Set a clue</Link>
-              <button className="icon-button" aria-label="Sign out" title="Sign out" onClick={() => signOut({ redirectUrl: basePath || '/' })}><LockKeyhole size={17} /></button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button className="header-sign-out" data-testid="button-sign-out" type="button">
+                    <LogOut size={16} aria-hidden="true" />
+                    <span>Sign out</span>
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="sign-out-dialog">
+                  <AlertDialogHeader className="sign-out-dialog-header">
+                    <AlertDialogTitle className="sign-out-dialog-title">Sign out of Clue Sprint?</AlertDialogTitle>
+                    <AlertDialogDescription className="sign-out-dialog-description">
+                      You can sign back in whenever you’re ready to solve again.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="sign-out-dialog-actions">
+                    <AlertDialogCancel className="button button-quiet" data-testid="button-cancel-sign-out">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="button button-primary"
+                      data-testid="button-confirm-sign-out"
+                      onClick={() => void signOut({ redirectUrl: basePath || '/' })}
+                    >
+                      Sign out
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           ) : (
             <>
