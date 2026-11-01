@@ -100,6 +100,60 @@ export const GetClueResponse = zod.object({
 
 
 /**
+ * @summary Update a clue challenge
+ */
+export const UpdateClueParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const updateClueBodyClueMin = 4;
+export const updateClueBodyClueMax = 240;
+
+export const updateClueBodyAnswerMax = 40;
+
+export const updateClueBodyWordplayMax = 1000;
+
+export const updateClueBodyMaxAttemptsMax = 10;
+
+
+
+export const UpdateClueBody = zod.object({
+  "clue": zod.string().min(updateClueBodyClueMin).max(updateClueBodyClueMax),
+  "answer": zod.string().min(1).max(updateClueBodyAnswerMax),
+  "wordplay": zod.string().min(1).max(updateClueBodyWordplayMax),
+  "maxAttempts": zod.number().int().min(1).max(updateClueBodyMaxAttemptsMax)
+})
+
+export const UpdateClueResponse = zod.object({
+  "id": zod.number().int(),
+  "slug": zod.string(),
+  "clue": zod.string(),
+  "answerLength": zod.number().int(),
+  "wordplay": zod.string().nullish(),
+  "maxAttempts": zod.number().int(),
+  "setterName": zod.string(),
+  "isOwner": zod.boolean().optional(),
+  "createdAt": zod.coerce.date(),
+  "userAttemptsUsed": zod.number().int().nullable(),
+  "userCompleted": zod.boolean().nullable(),
+  "userElapsedSeconds": zod.number().int().nullable(),
+  "userStartedAt": zod.coerce.date().nullable(),
+  "userSolved": zod.boolean().nullable(),
+  "revealedAnswer": zod.string().nullable()
+})
+
+
+/**
+ * @summary Retire a clue challenge
+ */
+export const RetireClueParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const RetireClueResponse = zod.void()
+
+
+/**
  * @summary Get a clue leaderboard
  */
 export const GetClueLeaderboardParams = zod.object({

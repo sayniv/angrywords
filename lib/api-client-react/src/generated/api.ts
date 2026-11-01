@@ -24,6 +24,7 @@ import type {
   AttemptResult,
   Clue,
   ClueInput,
+  ClueRetired,
   ClueStartResult,
   ClueSummary,
   Dashboard,
@@ -336,7 +337,7 @@ export const getGetClueQueryKey = (slug: string,) => {
     }
 
 
-export const getGetClueQueryOptions = <TData = Awaited<ReturnType<typeof getClue>>, TError = ErrorType<void>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetClueQueryOptions = <TData = Awaited<ReturnType<typeof getClue>>, TError = ErrorType<void | ClueRetired>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -355,14 +356,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetClueQueryResult = NonNullable<Awaited<ReturnType<typeof getClue>>>
-export type GetClueQueryError = ErrorType<void>
+export type GetClueQueryError = ErrorType<void | ClueRetired>
 
 
 /**
  * @summary Get a shared clue challenge
  */
 
-export function useGetClue<TData = Awaited<ReturnType<typeof getClue>>, TError = ErrorType<void>>(
+export function useGetClue<TData = Awaited<ReturnType<typeof getClue>>, TError = ErrorType<void | ClueRetired>>(
  slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -379,6 +380,169 @@ export function useGetClue<TData = Awaited<ReturnType<typeof getClue>>, TError =
 
 
 
+
+export const getUpdateClueUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}`
+}
+
+/**
+ * @summary Update a clue challenge
+ */
+export const updateClue = async (slug: string,
+    clueInput: ClueInput, options?: Parameters<typeof customFetch>[1]): Promise<Clue> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<Clue>(getUpdateClueUrl(slug),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clueInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateClueMutationKey = () => ['updateClue'] as const;
+
+export const getUpdateClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClue>>, TError,UpdateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateClue>>, TError,UpdateClueMutationVariables, TContext> => {
+
+const mutationKey = getUpdateClueMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateClue>>, UpdateClueMutationVariables> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  updateClue(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateClueMutationResult = NonNullable<Awaited<ReturnType<typeof updateClue>>>
+    export type UpdateClueMutationBody = BodyType<ClueInput>
+    export type UpdateClueMutationError = ErrorType<void | ClueRetired>
+    export type UpdateClueMutationVariables = {slug: string;data: BodyType<ClueInput>}
+
+    /**
+ * @summary Update a clue challenge
+ */
+export const useUpdateClue = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClue>>, TError,UpdateClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateClue>>,
+        TError,
+        UpdateClueMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateClueMutationOptions(options));
+    }
+
+export const getRetireClueUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}`
+}
+
+/**
+ * @summary Retire a clue challenge
+ */
+export const retireClue = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRetireClueUrl(slug),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRetireClueMutationKey = () => ['retireClue'] as const;
+
+export const getRetireClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retireClue>>, TError,RetireClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retireClue>>, TError,RetireClueMutationVariables, TContext> => {
+
+const mutationKey = getRetireClueMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retireClue>>, RetireClueMutationVariables> = (props) => {
+          const {slug} = props ?? {};
+
+          return  retireClue(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetireClueMutationResult = NonNullable<Awaited<ReturnType<typeof retireClue>>>
+
+    export type RetireClueMutationError = ErrorType<void | ClueRetired>
+    export type RetireClueMutationVariables = {slug: string}
+
+    /**
+ * @summary Retire a clue challenge
+ */
+export const useRetireClue = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retireClue>>, TError,RetireClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retireClue>>,
+        TError,
+        RetireClueMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRetireClueMutationOptions(options));
+    }
 
 export const getGetClueLeaderboardUrl = (slug: string,) => {
 
@@ -413,7 +577,7 @@ export const getGetClueLeaderboardQueryKey = (slug: string,) => {
     }
 
 
-export const getGetClueLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getClueLeaderboard>>, TError = ErrorType<unknown>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClueLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetClueLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getClueLeaderboard>>, TError = ErrorType<ClueRetired>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClueLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -432,14 +596,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetClueLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getClueLeaderboard>>>
-export type GetClueLeaderboardQueryError = ErrorType<unknown>
+export type GetClueLeaderboardQueryError = ErrorType<ClueRetired>
 
 
 /**
  * @summary Get a clue leaderboard
  */
 
-export function useGetClueLeaderboard<TData = Awaited<ReturnType<typeof getClueLeaderboard>>, TError = ErrorType<unknown>>(
+export function useGetClueLeaderboard<TData = Awaited<ReturnType<typeof getClueLeaderboard>>, TError = ErrorType<ClueRetired>>(
  slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getClueLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -500,7 +664,7 @@ return customFetch<AttemptResult>(getSubmitAttemptUrl(slug),
 
 export const getSubmitAttemptMutationKey = () => ['submitAttempt'] as const;
 
-export const getSubmitAttemptMutationOptions = <TError = ErrorType<void>,
+export const getSubmitAttemptMutationOptions = <TError = ErrorType<void | ClueRetired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAttempt>>, TError,SubmitAttemptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof submitAttempt>>, TError,SubmitAttemptMutationVariables, TContext> => {
 
@@ -529,13 +693,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SubmitAttemptMutationResult = NonNullable<Awaited<ReturnType<typeof submitAttempt>>>
     export type SubmitAttemptMutationBody = BodyType<AttemptInput>
-    export type SubmitAttemptMutationError = ErrorType<void>
+    export type SubmitAttemptMutationError = ErrorType<void | ClueRetired>
     export type SubmitAttemptMutationVariables = {slug: string;data: BodyType<AttemptInput>}
 
     /**
  * @summary Submit an answer attempt
  */
-export const useSubmitAttempt = <TError = ErrorType<void>,
+export const useSubmitAttempt = <TError = ErrorType<void | ClueRetired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAttempt>>, TError,SubmitAttemptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitAttempt>>,
@@ -574,7 +738,7 @@ export const startClue = async (slug: string, options?: Parameters<typeof custom
 
 export const getStartClueMutationKey = () => ['startClue'] as const;
 
-export const getStartClueMutationOptions = <TError = ErrorType<void>,
+export const getStartClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startClue>>, TError,StartClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof startClue>>, TError,StartClueMutationVariables, TContext> => {
 
@@ -603,13 +767,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type StartClueMutationResult = NonNullable<Awaited<ReturnType<typeof startClue>>>
 
-    export type StartClueMutationError = ErrorType<void>
+    export type StartClueMutationError = ErrorType<void | ClueRetired>
     export type StartClueMutationVariables = {slug: string}
 
     /**
  * @summary Start or resume a clue challenge
  */
-export const useStartClue = <TError = ErrorType<void>,
+export const useStartClue = <TError = ErrorType<void | ClueRetired>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startClue>>, TError,StartClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof startClue>>,

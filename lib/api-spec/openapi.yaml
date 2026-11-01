@@ -83,6 +83,72 @@ paths:
                 $ref: "#/components/schemas/Clue"
         "404":
           description: Clue not found
+        "410":
+          description: Clue has been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
+    patch:
+      operationId: updateClue
+      tags: [clues]
+      summary: Update a clue challenge
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClueInput"
+      responses:
+        "200":
+          description: Updated clue challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clue"
+        "403":
+          description: Only the original setter can update this clue
+        "404":
+          description: Clue not found
+        "410":
+          description: Clue has been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
+    delete:
+      operationId: retireClue
+      tags: [clues]
+      summary: Retire a clue challenge
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Clue retired; attempt and leaderboard history retained
+        "403":
+          description: Only the original setter can retire this clue
+        "404":
+          description: Clue not found
+        "410":
+          description: Clue has already been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /clues/{slug}/leaderboard:
     get:
       operationId: getClueLeaderboard
@@ -103,6 +169,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
+        "410":
+          description: Clue has been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /clues/{slug}/attempts:
     post:
       operationId: submitAttempt
@@ -135,6 +207,12 @@ paths:
           description: Setters cannot compete on their own clue
         "409":
           description: Complete public ID setup before solving
+        "410":
+          description: Clue has been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /clues/{slug}/start:
     post:
       operationId: startClue
@@ -161,6 +239,12 @@ paths:
           description: Setters cannot compete on their own clue
         "409":
           description: Complete public ID setup before solving
+        "410":
+          description: Clue has been retired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /me/dashboard:
     get:
       operationId: getMyDashboard
@@ -265,6 +349,11 @@ components:
         answer: { type: string, minLength: 1, maxLength: 40 }
         wordplay: { type: string, minLength: 1, maxLength: 1000 }
         maxAttempts: { type: integer, minimum: 1, maximum: 10 }
+    ClueRetired:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
     AttemptInput:
       type: object
       required: [answer]

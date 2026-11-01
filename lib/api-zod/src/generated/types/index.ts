@@ -10,6 +10,7 @@ export * from './attemptInput';
 export * from './attemptResult';
 export * from './clue';
 export * from './clueInput';
+export * from './clueRetired';
 export * from './clueStartResult';
 export * from './clueSummary';
 export * from './dashboard';

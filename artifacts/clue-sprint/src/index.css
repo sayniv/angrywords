@@ -513,6 +513,12 @@
 .owner-note, .reveal-note { display: flex; gap: 11px; margin-top: 21px; padding: 15px; color: var(--sage); background: #e9ede2; border-left: 2px solid var(--sage); }
 .owner-note p, .reveal-note p { margin: 4px 0 0; color: #5f6c5f; font-size: 12px; line-height: 1.6; }
 .owner-note strong, .reveal-note strong { color: #365c49; font-size: 12px; }
+.owner-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.button-danger-outline { color: #a73c30; background: #fff8f4; border: 1px solid #e5b9aa; }
+.button-danger-outline:hover { border-color: #a73c30; background: #fff1eb; }
+.clue-editor { margin-top: 18px; }
+.clue-editor .field-label { display: block; margin-bottom: 8px; }
+.edit-attempt-control { margin: 22px 0; padding-top: 18px; border-top: 1px solid #e5dccf; }
 .guess-panel, .solved-panel { margin-top: 25px; padding: 22px; background: #efe9dc; border: 1px solid #e1d6c6; border-radius: 6px; }
 .guess-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .guess-top h2 { margin: 5px 0 0; font: 600 22px var(--app-font-serif); }

@@ -7,14 +7,15 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import {
   ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, Check, Clock3, Copy,
-  Crown, Feather, Lightbulb, LockKeyhole, Menu, PenLine, RotateCcw, Sparkles,
-  Trophy, X,
+  Crown, Feather, Lightbulb, LockKeyhole, Menu, PenLine, RotateCcw, Save, Sparkles,
+  Trash2, Trophy, X,
 } from 'lucide-react';
 import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
   getGetMyProfileQueryKey, getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
-  useGetMyDashboard, useGetMyProfile, useListClues, useStartClue, useSubmitAttempt,
-  useUpdateMyProfile,
+  useGetMyDashboard, useGetMyProfile, useListClues, useRetireClue, useStartClue,
+  useSubmitAttempt, useUpdateClue, useUpdateMyProfile,
+  type Clue as ClueDto,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -491,7 +492,7 @@ function CreatePage() {
 function ChallengePage() {
   const params = useParamsSafe();
   const slug = params.slug || '';
-  const { data: clue, isLoading, isError, refetch } = useGetClue(slug);
+  const { data: clue, isLoading, isError, error, refetch } = useGetClue(slug);
   const { data: leaderboard, isLoading: leaderboardLoading, isError: leaderboardError, refetch: refetchLeaderboard } =
     useGetClueLeaderboard(slug, { query: { queryKey: getGetClueLeaderboardQueryKey(slug), staleTime: 15_000, refetchOnMount: 'always' } });
   const submitAttempt = useSubmitAttempt();
@@ -501,6 +502,9 @@ function ChallengePage() {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<import('@workspace/api-client-react').AttemptResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [retiredLocally, setRetiredLocally] = useState(false);
+  const retireClue = useRetireClue();
   const [localElapsed, setLocalElapsed] = useState(0);
   const startRequested = useRef(false);
   useEffect(() => {
@@ -550,6 +554,19 @@ function ChallengePage() {
       setCopied(false);
     }
   };
+  const handleRetire = async () => {
+    if (!window.confirm('Retire this clue? It will stop accepting guesses and disappear from browsing. Existing attempts and leaderboard history will be kept, but the shared link will show that the clue is retired.')) return;
+    try {
+      await retireClue.mutateAsync({ slug });
+      setRetiredLocally(true);
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+    } catch {
+      window.alert('The clue could not be retired. Please try again.');
+    }
+  };
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!answer.trim() || !clue) return;
@@ -571,7 +588,8 @@ function ChallengePage() {
   };
   return <><Header /><main className="page-wrap challenge-page">
     <Link href="/" className="back-link"><ArrowLeft size={15} /> All clues</Link>
-    {isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>This clue has slipped away.</h2><p>It may have been moved, or the link may be mistyped.</p><button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button></div> :
+    {retiredLocally ? <div className="state-panel"><h2>Clue retired.</h2><p>It no longer accepts guesses. Existing attempts and leaderboard history have been preserved.</p><Link href="/dashboard" className="button button-outline">Back to your page <ArrowRight size={15} /></Link></div> :
+      isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>{(error as { status?: number } | null)?.status === 410 ? 'This clue has been retired.' : 'This clue has slipped away.'}</h2><p>{(error as { status?: number } | null)?.status === 410 ? 'The setter retired this challenge. Its old shared link is no longer active.' : 'It may have been moved, or the link may be mistyped.'}</p>{(error as { status?: number } | null)?.status === 410 ? <Link href="/" className="button button-outline">Browse current clues <ArrowRight size={15} /></Link> : <button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button>}</div> :
       <div className="challenge-layout">
         <section className="challenge-main">
           <div className="challenge-overline"><span className="eyebrow-dot" /> A CLUE FROM {clue.setterName.toUpperCase()}<span className="challenge-date">{new Date(clue.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><button className="share-link-button" onClick={copyChallengeLink} type="button"><Copy size={13} /> {copied ? 'Link copied' : 'Copy challenge link'}</button></div>
@@ -583,7 +601,14 @@ function ChallengePage() {
           </div>
           {clue.isOwner && clue.wordplay && <div className="owner-note"><Lightbulb size={17} /><div><strong>Your setter's note</strong><p>{clue.wordplay}</p></div></div>}
           {clue.isOwner ? (
-            <div className="owner-note"><Lightbulb size={17} /><div><strong>Your clue is live</strong><p>The answer is <b>{clue.revealedAnswer}</b>. Share the challenge link and see who solves it fastest.</p></div></div>
+            <>
+              <div className="owner-note"><Lightbulb size={17} /><div><strong>Your clue is live</strong><p>The answer is <b>{clue.revealedAnswer}</b>. Edits keep existing attempts and solve records. Share the challenge link and see who solves it fastest.</p></div></div>
+              <div className="owner-actions">
+                <button className="button button-outline" type="button" onClick={() => setEditing((current) => !current)}><PenLine size={15} /> {editing ? 'Close editor' : 'Edit clue'}</button>
+                <button className="button button-danger-outline" type="button" disabled={retireClue.isPending} onClick={() => void handleRetire()}><Trash2 size={15} /> {retireClue.isPending ? 'Retiring…' : 'Retire clue'}</button>
+              </div>
+              {editing && <ClueEditor slug={slug} clue={clue} onSaved={() => setEditing(false)} />}
+            </>
           ) : !isSignedIn ? (
             <div className="guess-panel"><div className="guess-top"><div><span className="form-index">READY WHEN YOU ARE</span><h2>Join the race</h2></div><div className="timer-chip"><Clock3 size={14} /> {formatTime(0)}</div></div><p className="board-subtitle">Sign in to start your timer and save your attempts across devices.</p><Link href={`/sign-in?next=${encodeURIComponent(window.location.pathname)}`} className="button button-primary">Sign in to solve <ArrowRight size={16} /></Link></div>
           ) : startClue.isError ? (
@@ -621,6 +646,66 @@ function ChallengePage() {
       </div>
     }
   </main><Footer /></>;
+}
+
+function ClueEditor({
+  slug,
+  clue,
+  onSaved,
+}: {
+  slug: string;
+  clue: ClueDto;
+  onSaved: () => void;
+}) {
+  const cache = useQueryClient();
+  const updateClue = useUpdateClue();
+  const [text, setText] = useState(clue.clue);
+  const [answer, setAnswer] = useState(clue.revealedAnswer ?? '');
+  const [wordplay, setWordplay] = useState(clue.wordplay ?? '');
+  const [maxAttempts, setMaxAttempts] = useState(clue.maxAttempts);
+  const [error, setError] = useState('');
+  const normalizedAnswer = answer.trim().replace(/[^a-z0-9]/gi, '');
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    if (text.trim().length < 4) { setError('A clue needs at least four characters.'); return; }
+    if (!normalizedAnswer) { setError('Add an answer with at least one letter or number.'); return; }
+    if (!wordplay.trim()) { setError('Add a short wordplay explanation.'); return; }
+    try {
+      const updated = await updateClue.mutateAsync({
+        slug,
+        data: {
+          clue: text.trim(),
+          answer: normalizedAnswer.toUpperCase(),
+          wordplay: wordplay.trim(),
+          maxAttempts,
+        },
+      });
+      cache.setQueryData(getGetClueQueryKey(slug), updated);
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getGetClueLeaderboardQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+      onSaved();
+    } catch {
+      setError('The clue could not be saved. Check your connection and try again.');
+    }
+  };
+
+  return <form className="paper-form clue-editor" onSubmit={submit}>
+    <div className="form-heading"><span className="form-index">SETTER'S DESK</span><h2>Update your clue</h2></div>
+    <label className="field-label" htmlFor="edit-clue-text">Your cryptic clue</label>
+    <textarea id="edit-clue-text" value={text} onChange={(event) => setText(event.target.value)} maxLength={240} required rows={3} />
+    <label className="field-label mt-6" htmlFor="edit-clue-answer">Answer</label>
+    <input id="edit-clue-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} maxLength={40} required />
+    <label className="field-label mt-6" htmlFor="edit-clue-wordplay">Wordplay explanation</label>
+    <textarea id="edit-clue-wordplay" value={wordplay} onChange={(event) => setWordplay(event.target.value)} maxLength={1000} required rows={3} />
+    <div className="attempt-control edit-attempt-control"><div><h2>Maximum attempts</h2><p>Existing attempts are preserved.</p></div><div className="attempt-stepper"><button type="button" aria-label="Fewer attempts" onClick={() => setMaxAttempts(Math.max(1, maxAttempts - 1))}><span>−</span></button><strong>{maxAttempts}</strong><button type="button" aria-label="More attempts" onClick={() => setMaxAttempts(Math.min(10, maxAttempts + 1))}><span>+</span></button></div></div>
+    {error && <div className="form-error" role="alert"><X size={16} />{error}</div>}
+    <button className="button button-primary publish-button" type="submit" disabled={updateClue.isPending}><Save size={16} /> {updateClue.isPending ? 'Saving…' : 'Save changes'}</button>
+  </form>;
 }
 
 function useParamsSafe() { return useParams<{ slug: string }>(); }

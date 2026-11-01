@@ -13,6 +13,7 @@ export const cluesTable = pgTable("clues", {
   setterUserId: text("setter_user_id").notNull(),
   setterName: varchar("setter_name", { length: 48 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  retiredAt: timestamp("retired_at", { withTimezone: true }),
 });
 
 export const insertClueSchema = createInsertSchema(cluesTable).omit({

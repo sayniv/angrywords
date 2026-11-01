@@ -68,6 +68,10 @@ export interface ClueInput {
   maxAttempts: number;
 }
 
+export interface ClueRetired {
+  error: string;
+}
+
 export interface AttemptInput {
   /**
      * @minLength 1

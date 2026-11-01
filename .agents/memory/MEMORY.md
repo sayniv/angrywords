@@ -1,0 +1,1 @@
+- [Clue retirement and edit history](clue-retirement-history.md) — retired clues keep solver records; edits preserve historical solves and active progress.

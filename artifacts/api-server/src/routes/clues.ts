@@ -1,7 +1,7 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { Router, type IRouter, type RequestHandler } from "express";
 import { getAuth } from "@clerk/express";
-import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import {
   AttemptResult,
   CreateClueBody,
@@ -13,11 +13,15 @@ import {
   GetMyDashboardResponse,
   GetMyProfileResponse,
   ListCluesResponse,
+  RetireClueParams,
   StartClueParams,
   StartClueResponse,
   SubmitAttemptBody,
   SubmitAttemptParams,
   SubmitAttemptResponse,
+  UpdateClueBody,
+  UpdateClueParams,
+  UpdateClueResponse,
   UpdateMyProfileBody,
   UpdateMyProfileResponse,
 } from "@workspace/api-zod";
@@ -129,6 +133,7 @@ router.get("/clues", async (_req, res): Promise<void> => {
   const clues = await db
     .select()
     .from(cluesTable)
+    .where(isNull(cluesTable.retiredAt))
     .orderBy(desc(cluesTable.createdAt))
     .limit(30);
   const counts = await solveCounts(clues.map((clue) => clue.id));
@@ -199,6 +204,159 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
   res.status(201).json(CreateClueResponse.parse(response));
 });
 
+router.patch("/clues/:slug", requireAuth, async (req, res): Promise<void> => {
+  const params = UpdateClueParams.safeParse(req.params);
+  const parsed = UpdateClueBody.safeParse(req.body);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  const [existing] = await db
+    .select()
+    .from(cluesTable)
+    .where(eq(cluesTable.slug, params.data.slug))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Clue not found." });
+    return;
+  }
+  if (existing.setterUserId !== userId) {
+    res.status(403).json({ error: "Only the original setter can update this clue." });
+    return;
+  }
+  if (existing.retiredAt) {
+    res.status(410).json({ error: "This clue has been retired and can no longer be edited." });
+    return;
+  }
+
+  const answer = normalizeAnswer(parsed.data.answer);
+  if (!answer) {
+    res.status(400).json({ error: "The answer must contain at least one letter or number." });
+    return;
+  }
+  const now = new Date();
+  const updated = await db.transaction(async (tx) => {
+    const [clue] = await tx
+      .update(cluesTable)
+      .set({
+        clue: parsed.data.clue.trim(),
+        answer: parsed.data.answer.trim(),
+        normalizedAnswer: answer,
+        wordplay: parsed.data.wordplay.trim() || null,
+        maxAttempts: parsed.data.maxAttempts,
+      })
+      .where(
+        and(
+          eq(cluesTable.id, existing.id),
+          eq(cluesTable.setterUserId, userId),
+          isNull(cluesTable.retiredAt),
+        ),
+      )
+      .returning();
+    if (!clue) return null;
+
+    const activeProgress = await tx
+      .select()
+      .from(solverProgressTable)
+      .where(
+        and(
+          eq(solverProgressTable.clueId, clue.id),
+          isNull(solverProgressTable.solvedAt),
+          isNull(solverProgressTable.failedAt),
+        ),
+      );
+    for (const progress of activeProgress) {
+      if (progress.attemptsUsed >= clue.maxAttempts) {
+        await tx
+          .update(solverProgressTable)
+          .set({
+            failedAt: now,
+            elapsedSeconds: Math.max(
+              0,
+              Math.floor((now.getTime() - progress.startedAt.getTime()) / 1000),
+            ),
+          })
+          .where(eq(solverProgressTable.id, progress.id));
+      }
+    }
+    return clue;
+  });
+  if (!updated) {
+    res.status(410).json({ error: "This clue has been retired and can no longer be edited." });
+    return;
+  }
+
+  res.json(
+    UpdateClueResponse.parse({
+      id: updated.id,
+      slug: updated.slug,
+      clue: updated.clue,
+      answerLength: answer.length,
+      wordplay: updated.wordplay,
+      maxAttempts: updated.maxAttempts,
+      setterName: updated.setterName,
+      isOwner: true,
+      createdAt: updated.createdAt,
+      userAttemptsUsed: null,
+      userCompleted: null,
+      userElapsedSeconds: null,
+      userStartedAt: null,
+      userSolved: null,
+      revealedAnswer: updated.answer,
+    }),
+  );
+});
+
+router.delete("/clues/:slug", requireAuth, async (req, res): Promise<void> => {
+  const params = RetireClueParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  const [existing] = await db
+    .select()
+    .from(cluesTable)
+    .where(eq(cluesTable.slug, params.data.slug))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Clue not found." });
+    return;
+  }
+  if (existing.setterUserId !== userId) {
+    res.status(403).json({ error: "Only the original setter can retire this clue." });
+    return;
+  }
+  if (existing.retiredAt) {
+    res.status(410).json({ error: "This clue has already been retired." });
+    return;
+  }
+
+  const [retired] = await db
+    .update(cluesTable)
+    .set({ retiredAt: new Date() })
+    .where(
+      and(
+        eq(cluesTable.id, existing.id),
+        eq(cluesTable.setterUserId, userId),
+        isNull(cluesTable.retiredAt),
+      ),
+    )
+    .returning({ id: cluesTable.id });
+  if (!retired) {
+    res.status(410).json({ error: "This clue has already been retired." });
+    return;
+  }
+  res.sendStatus(204);
+});
+
 router.get("/clues/:slug", async (req, res): Promise<void> => {
   const params = GetClueParams.safeParse(req.params);
   if (!params.success) {
@@ -213,6 +371,10 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     .limit(1);
   if (!clue) {
     res.status(404).json({ error: "Clue not found." });
+    return;
+  }
+  if (clue.retiredAt) {
+    res.status(410).json({ error: "This clue has been retired by its setter." });
     return;
   }
 
@@ -272,12 +434,16 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
     return;
   }
   const [clue] = await db
-    .select({ id: cluesTable.id })
+    .select({ id: cluesTable.id, retiredAt: cluesTable.retiredAt })
     .from(cluesTable)
     .where(eq(cluesTable.slug, params.data.slug))
     .limit(1);
   if (!clue) {
     res.status(404).json({ error: "Clue not found." });
+    return;
+  }
+  if (clue.retiredAt) {
+    res.status(410).json({ error: "This clue has been retired by its setter." });
     return;
   }
   const rows = await db
@@ -330,6 +496,10 @@ router.post(
       .limit(1);
     if (!clue) {
       res.status(404).json({ error: "Clue not found." });
+      return;
+    }
+    if (clue.retiredAt) {
+      res.status(410).json({ error: "This clue has been retired by its setter." });
       return;
     }
     const userId = getAuth(req).userId!;
@@ -400,6 +570,10 @@ router.post(
       .limit(1);
     if (!clue) {
       res.status(404).json({ error: "Clue not found." });
+      return;
+    }
+    if (clue.retiredAt) {
+      res.status(410).json({ error: "This clue has been retired by its setter." });
       return;
     }
 
@@ -565,7 +739,7 @@ router.get("/me/dashboard", requireAuth, async (req, res): Promise<void> => {
   const recent = await db
     .select()
     .from(cluesTable)
-    .where(eq(cluesTable.setterUserId, userId))
+    .where(and(eq(cluesTable.setterUserId, userId), isNull(cluesTable.retiredAt)))
     .orderBy(desc(cluesTable.createdAt))
     .limit(6);
   const counts = await solveCounts(recent.map((clue) => clue.id));
