@@ -16,13 +16,16 @@ const api = vi.hoisted(() => ({
   clueLeaderboard: vi.fn(),
   mutation: vi.fn(),
   nextRecommendation: vi.fn(),
+  queryClient: undefined as { invalidateQueries: ReturnType<typeof vi.fn> } | undefined,
+  user: undefined as { id: string } | undefined,
+  profile: undefined as { data: { publicId: string; claimedPublicIds: string[]; isGuest: boolean; needsSetup: boolean; blurb: string | null } } | undefined,
 }));
 
 vi.mock('@clerk/react', () => ({
   ClerkProvider: ({ children }: { children: ReactNode }) => children,
   SignIn: () => null,
   SignUp: () => null,
-  useUser: () => ({ isLoaded: true, isSignedIn: false }),
+  useUser: () => ({ isLoaded: true, isSignedIn: Boolean(api.user), user: api.user }),
   useClerk: () => ({ addListener: () => () => {}, signOut: vi.fn() }),
 }));
 
@@ -32,7 +35,11 @@ vi.mock('@clerk/react/internal', () => ({
 
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
-  return { ...actual, useInfiniteQuery: api.infiniteQuery };
+  return {
+    ...actual,
+    useInfiniteQuery: api.infiniteQuery,
+    useQueryClient: () => api.queryClient ?? actual.useQueryClient(),
+  };
 });
 
 vi.mock('@workspace/api-client-react', () => ({
@@ -45,7 +52,7 @@ vi.mock('@workspace/api-client-react', () => ({
   getGetSetterLeaderboardQueryKey: () => ['setter-leaderboard'],
   getListCluesQueryKey: (params?: unknown) => ['clues', params],
   listClues: api.listClues,
-  useGetMyProfile: () => ({ data: undefined }),
+  useGetMyProfile: () => api.profile ?? ({ data: undefined }),
   useGetClue: api.getClue,
   useGetClueLeaderboard: api.clueLeaderboard,
   useSubmitAttempt: api.mutation,
@@ -169,6 +176,9 @@ describe('Home and Explore destinations', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    api.queryClient = undefined;
+    api.user = undefined;
+    api.profile = undefined;
     window.history.replaceState({}, '', '/');
   });
 
@@ -462,6 +472,82 @@ describe('Home and Explore destinations', () => {
     expect(api.getClue).toHaveBeenLastCalledWith('clue-41', expect.objectContaining({
       query: expect.objectContaining({ enabled: true }),
     }));
+  });
+
+  it('refreshes the tier board after a successful solve and highlights the server-ranked entry', async () => {
+    api.user = { id: 'current-solver' };
+    api.profile = {
+      data: { publicId: 'Current solver', claimedPublicIds: ['Current solver'], isGuest: false, needsSetup: false, blurb: null },
+    };
+    const slug = 'clue-81';
+    const solvedAt = '2026-11-01T12:01:57.000Z';
+    const updatedBoard = {
+      noHintsNoAssist: [{
+        rank: 3,
+        displayName: 'Current solver',
+        elapsedSeconds: 117,
+        attemptsUsed: 2,
+        solvedAt,
+        isCurrentUser: true,
+      }],
+      hintsUsedNoAssist: [],
+      assistUsed: [],
+    };
+    let leaderboardInvalidated = false;
+    api.queryClient = {
+      invalidateQueries: vi.fn(async ({ queryKey }: { queryKey: unknown[] }) => {
+        if (queryKey[0] === 'clue-leaderboard' && queryKey[1] === slug) {
+          leaderboardInvalidated = true;
+        }
+      }),
+    };
+    api.getClue.mockReturnValue({
+      data: { ...challengeClue(81), userStartedAt: '2026-11-01T12:00:00.000Z', userAssistEnabled: false },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    api.clueLeaderboard.mockImplementation(() => ({
+      data: leaderboardInvalidated
+        ? updatedBoard
+        : { noHintsNoAssist: [], hintsUsedNoAssist: [], assistUsed: [] },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    }));
+    api.mutation.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        correct: true,
+        attemptsUsed: 2,
+        attemptsRemaining: 3,
+        completed: true,
+        elapsedSeconds: 117,
+        message: 'That’s the one!',
+      }),
+      isPending: false,
+      isError: false,
+      reset: vi.fn(),
+    });
+
+    renderAppAt(`/clue/${slug}`);
+    const user = userEvent.setup();
+    await user.type(screen.getByTestId('input-guess'), 'answer');
+    await user.click(screen.getByTestId('button-submit-guess'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('text-own-solve-gold').textContent).toBe('You');
+    });
+    expect(api.queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['clue-leaderboard', slug],
+    });
+    expect(api.clueLeaderboard).toHaveBeenCalledWith(slug, expect.objectContaining({
+      query: expect.objectContaining({
+        queryKey: ['clue-leaderboard', slug, 'current-solver'],
+      }),
+    }));
+    const personalRow = screen.getByTestId('row-leader-gold-3');
+    expect(personalRow.textContent).toContain('03');
+    expect(personalRow.textContent).toContain('1:57');
   });
 
   it('returns to the catalog and reopens the same clue through browser history', async () => {

@@ -202,11 +202,11 @@ test("the clue leaderboard API contract includes empty and populated tiers", () 
     noHintsNoAssist: [],
     hintsUsedNoAssist: [],
     assistUsed: [{
-      rank: 1,
+      rank: 3,
       displayName: "Hint Solver",
-      elapsedSeconds: 245,
+      elapsedSeconds: 117,
       attemptsUsed: 2,
-      solvedAt: solvedAt(0),
+      solvedAt: solvedAt(9),
       isCurrentUser: true,
     }],
   });
@@ -215,5 +215,8 @@ test("the clue leaderboard API contract includes empty and populated tiers", () 
   assert.deepEqual(parsed.hintsUsedNoAssist, []);
   assert.equal(parsed.assistUsed.length, 1);
   assert.equal(parsed.assistUsed[0]?.displayName, "Hint Solver");
+  assert.equal(parsed.assistUsed[0]?.rank, 3);
+  assert.equal(parsed.assistUsed[0]?.elapsedSeconds, 117);
   assert.equal(parsed.assistUsed[0]?.isCurrentUser, true);
+  assert.equal(new Date(parsed.assistUsed[0]!.solvedAt).getTime(), solvedAt(9).getTime());
 });
