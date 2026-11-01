@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import {
   getClueSolution,
   getClueProgressState,
@@ -26,12 +27,76 @@ import { CreateClueBody } from "@workspace/api-zod";
 import { confirmHintReveal } from "../../clue-sprint/src/lib/hint-confirmation.ts";
 import { getGuessFeedback } from "../src/lib/guess-feedback.ts";
 import { StartClueBody, StartClueResponse, SubmitAttemptResponse } from "@workspace/api-zod";
+import {
+  getClueListingOrder,
+  getPlayableClueFilter,
+  serializePublicClueSummary,
+} from "../src/lib/clue-listing.ts";
 
 const postgresDialect = new PgDialect();
 const solution = {
   answer: "SUNSET",
   wordplay: "Sun + set makes sunset.",
 };
+
+test("public clue listings include only playable clues and sort top ratings deterministically", () => {
+  const playableFilter = postgresDialect.sqlToQuery(
+    getPlayableClueFilter(
+      sql`"clues"."retired_at"`,
+      sql`"clues"."blocked_at"`,
+    ),
+  );
+  assert.match(playableFilter.sql, /"clues"\."retired_at" is null/);
+  assert.match(playableFilter.sql, /"clues"\."blocked_at" is null/);
+
+  const popularOrder = postgresDialect.sqlToQuery(sql.join(
+    getClueListingOrder(true, {
+      averageRating: sql`"ratings"."average_rating"`,
+      ratingCount: sql`"ratings"."rating_count"`,
+      createdAt: sql`"clues"."created_at"`,
+      id: sql`"clues"."id"`,
+    }),
+    sql`, `,
+  )).sql;
+  assert.match(popularOrder, /"ratings"\."average_rating" DESC NULLS LAST/);
+  assert.match(popularOrder, /"ratings"\."rating_count" desc/i);
+  assert.match(popularOrder, /"clues"\."created_at" desc/i);
+  assert.match(popularOrder, /"clues"\."id" desc/i);
+
+  const newestOrder = postgresDialect.sqlToQuery(sql.join(
+    getClueListingOrder(false, {
+      averageRating: sql`"ratings"."average_rating"`,
+      ratingCount: sql`"ratings"."rating_count"`,
+      createdAt: sql`"clues"."created_at"`,
+      id: sql`"clues"."id"`,
+    }),
+    sql`, `,
+  )).sql;
+  assert.match(newestOrder, /"clues"\."created_at" desc, "clues"\."id" desc/i);
+});
+
+test("public clue listing serialization exposes answer length but never the answer", () => {
+  const summary = serializePublicClueSummary({
+    id: 91,
+    slug: "hidden-solution",
+    clue: "Hidden clue wording",
+    answer: "SECRET WORD",
+    maxAttempts: 5,
+    setterName: "Legacy setter",
+    blockedAt: null,
+    createdAt: new Date("2026-11-01T12:00:00.000Z"),
+    averageRating: "4.5",
+    ratingCount: "2",
+  }, 3, { publicId: "PuzzleFriend", blurb: "A small setter note." });
+
+  assert.equal(summary.answerLength, 10);
+  assert.equal(summary.setterName, "PuzzleFriend");
+  assert.equal(summary.setterBlurb, "A small setter note.");
+  assert.equal(summary.averageRating, 4.5);
+  assert.equal(summary.ratingCount, 2);
+  assert.equal(Object.hasOwn(summary, "answer"), false);
+  assert.equal(Object.hasOwn(summary, "wordplay"), false);
+});
 
 test("signed-out visitors and solvers with active runs do not receive the solution", () => {
   assert.deepEqual(getClueSolution(undefined, false, solution), {

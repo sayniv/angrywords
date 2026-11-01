@@ -148,6 +148,8 @@ function ClerkRoutes() {
           <ProfileGate>
             <Switch>
               <Route path="/" component={HomeRedirect} />
+              <Route path="/explore" component={ExploreRoute} />
+              <Route path="/explore/popular" component={PopularExploreRoute} />
               <Route path="/sign-in/*?" component={SignInPage} />
               <Route path="/sign-up/*?" component={SignUpPage} />
               <Route path="/create" component={CreateGate} />
@@ -186,6 +188,14 @@ function HomeRedirect() {
   const { isLoaded } = useUser();
   if (!isLoaded) return <PageSkeleton />;
   return <HomePage />;
+}
+
+function ExploreRoute() {
+  return <ExplorePage sort="newest" />;
+}
+
+function PopularExploreRoute() {
+  return <ExplorePage sort="rating" />;
 }
 
 function Protected({ children }: { children: ReactNode }) {
@@ -334,7 +344,7 @@ function TutorialRoute() {
   return <><Header active="tutorial" /><TutorialPage /><Footer /></>;
 }
 
-export function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' | 'tutorial' }) {
+export function Header({ active = 'home' }: { active?: 'home' | 'explore' | 'dashboard' | 'tutorial' }) {
   const { isSignedIn } = useUser();
   const { data: profile } = useGetMyProfile({
     query: { queryKey: getGetMyProfileQueryKey(), enabled: Boolean(isSignedIn) },
@@ -346,7 +356,8 @@ export function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' 
       <div className="page-wrap flex h-[76px] items-center justify-between">
         <Brand />
         <nav className="hidden items-center gap-8 md:flex">
-          <Link href="/" className={`nav-link ${active === 'browse' ? 'nav-active' : ''}`}>Explore clues</Link>
+          <Link href="/" className={`nav-link ${active === 'home' ? 'nav-active' : ''}`} data-testid="link-home">Home</Link>
+          <Link href="/explore" className={`nav-link ${active === 'explore' ? 'nav-active' : ''}`} data-testid="link-explore">Explore clues</Link>
           <Link href="/tutorial" className={`nav-link ${active === 'tutorial' ? 'nav-active' : ''}`}>Learn cryptics</Link>
           {isSignedIn && <Link href="/dashboard" className={`nav-link ${active === 'dashboard' ? 'nav-active' : ''}`}>My page</Link>}
         </nav>
@@ -392,7 +403,8 @@ export function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' 
         <button className="icon-button md:hidden" aria-label="Toggle navigation" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={20} /></button>
       </div>
       {mobileOpen && <div className="mobile-menu md:hidden">
-        <Link href="/" className="nav-link" onClick={() => setMobileOpen(false)}>Explore clues</Link>
+        <Link href="/" className={`nav-link ${active === 'home' ? 'nav-active' : ''}`} data-testid="mobile-link-home" onClick={() => setMobileOpen(false)}>Home</Link>
+        <Link href="/explore" className={`nav-link ${active === 'explore' ? 'nav-active' : ''}`} data-testid="mobile-link-explore" onClick={() => setMobileOpen(false)}>Explore clues</Link>
         <Link href="/tutorial" className={`nav-link ${active === 'tutorial' ? 'nav-active' : ''}`} onClick={() => setMobileOpen(false)}>Learn cryptics</Link>
         {isSignedIn && <Link href="/dashboard" className="nav-link" onClick={() => setMobileOpen(false)}>My page</Link>}
         {isSignedIn ? <Link href="/create" className="button button-primary" onClick={() => setMobileOpen(false)}>Set a clue <PenLine size={15} /></Link> : <Link href="/sign-in" className="button button-primary" onClick={() => setMobileOpen(false)}>Sign in <ArrowRight size={15} /></Link>}
@@ -401,16 +413,12 @@ export function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' 
   );
 }
 
-function HomePage() {
-  const [sort, setSort] = useState<'newest' | 'rating'>('newest');
-  const { data: clues, isLoading, isError, refetch } = useListClues({ sort }, {
-    query: { queryKey: getListCluesQueryKey({ sort }), staleTime: 15_000 },
-  });
+export function HomePage() {
   const solvers = useGetSolverLeaderboard({ query: { queryKey: getGetSolverLeaderboardQueryKey() } });
   const setters = useGetSetterLeaderboard({ query: { queryKey: getGetSetterLeaderboardQueryKey() } });
   return (
     <div className="min-h-[100dvh]">
-      <Header />
+      <Header active="home" />
       <main>
         <section className="hero-section">
           <div className="page-wrap hero-grid">
@@ -419,7 +427,7 @@ function HomePage() {
               <h1 className="hero-title">Words with<br /><em>a twist.</em></h1>
               <p className="hero-description">A cryptic clue from a friend. A handful of guesses. Bragging rights that last until the next one.</p>
               <div className="hero-actions">
-                <a href="#open-clues" className="button button-primary">Find your first clue <ArrowDownRight size={17} /></a>
+                <Link href="/explore" className="button button-primary" data-testid="link-find-clue">Find your first clue <ArrowDownRight size={17} /></Link>
                 <Link href="/sign-up" className="button button-quiet">Set one for friends <ArrowUpRight size={16} /></Link>
               </div>
               <div className="hero-note"><span className="note-rule" /> Made for the group chat that loves a puzzle.</div>
@@ -439,29 +447,6 @@ function HomePage() {
           <div className="ticker"><div className="ticker-track"><span>Think sideways</span><Sparkles size={13} /><span>Race your friends</span><Sparkles size={13} /><span>Share the aha</span><Sparkles size={13} /><span>Think sideways</span><Sparkles size={13} /><span>Race your friends</span><Sparkles size={13} /><span>Share the aha</span><Sparkles size={13} /></div></div>
         </section>
 
-        <section id="open-clues" className="clues-section">
-          <div className="page-wrap">
-            <div className="section-topline">
-              <div><div className="eyebrow"><span className="eyebrow-dot" /> OPEN FOR SOLVING</div><h2 className="section-title">Fresh from the setters</h2></div>
-              <div className="clue-tools"><p className="section-aside">A clue is a tiny mystery.<br />Pick one and have a go.</p>
-                <label className="sort-control">SORT BY <select data-testid="select-clue-sort" value={sort} onChange={(event) => setSort(event.target.value as 'newest' | 'rating')}><option value="newest">Newest</option><option value="rating">Top rated</option></select></label>
-              </div>
-            </div>
-            {isLoading ? <ClueSkeletons /> : isError ? (
-              <div className="state-panel"><h3>Clues are taking a breather.</h3><p>Give it another try in a moment.</p><button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button></div>
-            ) : clues?.length ? (
-              <div className="clue-grid">
-                {clues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}
-              </div>
-            ) : (
-              <div className="empty-clues">
-                <div className="empty-stamp"><Feather size={27} /></div><div><h3>It's quiet on the clue front.</h3><p>Be the first to leave a little wordplay behind.</p></div>
-                <Link href="/sign-up" className="button button-primary">Set the first clue <ArrowRight size={15} /></Link>
-              </div>
-            )}
-            <div className="bottom-invite"><span className="invite-star"><Sparkles size={18} /></span><p>Have a clue rattling around in your head?</p><Link href="/sign-up">Bring it to the table <ArrowRight size={15} /></Link></div>
-          </div>
-        </section>
         <section className="public-leaderboards">
           <div className="page-wrap">
             <div className="section-topline"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE FRIENDLY RIVALRY</div><h2 className="section-title">Good minds, good clues.</h2></div><p className="section-aside">Two ways to earn a little glory.</p></div>
@@ -481,6 +466,54 @@ function HomePage() {
             </div>
           </div>
         </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
+  const { data: clues, isLoading, isError, refetch } = useListClues({ sort }, {
+    query: { queryKey: getListCluesQueryKey({ sort }), staleTime: 15_000 },
+  });
+  const isPopular = sort === 'rating';
+  return (
+    <div className="min-h-[100dvh]">
+      <Header active="explore" />
+      <main className="clues-section explore-page">
+        <div className="page-wrap">
+          <div className="section-topline">
+            <div>
+              <div className="eyebrow"><span className="eyebrow-dot" /> OPEN FOR SOLVING</div>
+              <h1 className="section-title">{isPopular ? 'Most loved clues' : 'Explore clues'}</h1>
+            </div>
+            <div className="clue-tools">
+              <p className="section-aside">{isPopular ? 'The highest-rated puzzles, first.' : 'Every playable clue, ready for a go.'}</p>
+              <nav className="catalog-nav" aria-label="Clue catalog views">
+                <Link href="/explore" className={`catalog-nav-link ${!isPopular ? 'catalog-nav-active' : ''}`} aria-current={!isPopular ? 'page' : undefined} data-testid="link-all-clues">All clues</Link>
+                <Link href="/explore/popular" className={`catalog-nav-link ${isPopular ? 'catalog-nav-active' : ''}`} aria-current={isPopular ? 'page' : undefined} data-testid="link-highest-rated">Highest rated</Link>
+              </nav>
+            </div>
+          </div>
+          {isLoading ? <ClueSkeletons /> : isError ? (
+            <div className="state-panel" role="alert">
+              <h2>Clues are taking a breather.</h2>
+              <p>Give it another try in a moment.</p>
+              <button className="button button-outline" type="button" data-testid="button-retry-clues" onClick={() => void refetch()}>Try again <RotateCcw size={15} /></button>
+            </div>
+          ) : clues?.length ? (
+            <div className="clue-grid" data-testid="list-playable-clues">
+              {clues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}
+            </div>
+          ) : (
+            <div className="empty-clues" data-testid="empty-playable-clues">
+              <div className="empty-stamp"><Feather size={27} /></div>
+              <div><h3>It's quiet on the clue front.</h3><p>Be the first to leave a little wordplay behind.</p></div>
+              <Link href="/sign-up" className="button button-primary">Set the first clue <ArrowRight size={15} /></Link>
+            </div>
+          )}
+          <div className="bottom-invite"><span className="invite-star"><Sparkles size={18} /></span><p>Have a clue rattling around in your head?</p><Link href="/sign-up">Bring it to the table <ArrowRight size={15} /></Link></div>
+        </div>
       </main>
       <Footer />
     </div>

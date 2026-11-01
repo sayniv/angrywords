@@ -212,6 +212,10 @@
 @keyframes reveal-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
 .clue-tools { display: flex; align-items: end; gap: 28px; }
+.catalog-nav { display: flex; gap: 6px; padding: 4px; background: #f1ebdf; border: 1px solid var(--line); border-radius: 7px; }
+.catalog-nav-link { padding: 8px 11px; color: #75685e; border-radius: 4px; font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.catalog-nav-link:hover, .catalog-nav-active { color: var(--tomato-dark); background: #fffdf8; box-shadow: 0 1px 3px #382c2412; }
+.explore-page { min-height: calc(100vh - 150px); }
 .sort-control { display: grid; gap: 6px; color: #938272; font: 500 9px var(--app-font-mono); letter-spacing: .12em; }
 .sort-control select { min-width: 138px; padding: 9px 30px 9px 11px; color: var(--ink); background: #fffdf8; border: 1px solid var(--line); border-radius: 5px; font: 600 12px var(--app-font-sans); letter-spacing: 0; cursor: pointer; }
 .setter-blurb-card { margin: 0 0 4px; padding: 9px 10px; color: #6c6256; background: #f5f0e6; border-left: 2px solid #b7a58f; font-size: 10px; line-height: 1.55; }

@@ -81,6 +81,12 @@ import {
 import { buildClueLeaderboardEntries } from "../lib/clue-leaderboard";
 import { getGuessFeedback } from "../lib/guess-feedback";
 
+import {
+  getClueListingOrder,
+  getPlayableClueFilter,
+  serializePublicClueSummary,
+} from "../lib/clue-listing";
+
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
 const SOLVER_ACTIVITY_PAGE_SIZE = 10;
@@ -312,33 +318,22 @@ router.get("/clues", async (req, res): Promise<void> => {
     })
     .from(cluesTable)
     .leftJoin(ratings, eq(ratings.clueId, cluesTable.id))
-    .where(and(isNull(cluesTable.retiredAt), isNull(cluesTable.blockedAt)))
-    .orderBy(
-      ...(sortByRating
-        ? [
-            sql`${ratings.averageRating} DESC NULLS LAST`,
-            desc(ratings.ratingCount),
-            desc(cluesTable.createdAt),
-          ]
-        : [desc(cluesTable.createdAt)]),
-    )
-    .limit(30);
+    .where(getPlayableClueFilter(cluesTable.retiredAt, cluesTable.blockedAt))
+    .orderBy(...getClueListingOrder(sortByRating, {
+      averageRating: ratings.averageRating,
+      ratingCount: ratings.ratingCount,
+      createdAt: cluesTable.createdAt,
+      id: cluesTable.id,
+    }));
   const counts = await solveCounts(clues.map((clue) => clue.id));
   const publicProfiles = await publicProfilesForUsers(clues.map((clue) => clue.setterUserId));
-  const response = clues.map((clue) => ({
-    id: clue.id,
-    slug: clue.slug,
-    clue: clue.clue,
-    answerLength: normalizeAnswer(clue.answer).length,
-    maxAttempts: clue.maxAttempts,
-    setterName: publicProfiles.get(clue.setterUserId)?.publicId ?? clue.setterName,
-    setterBlurb: publicProfiles.get(clue.setterUserId)?.blurb ?? null,
-    solveCount: counts.get(clue.id) ?? 0,
-    averageRating: clue.averageRating === null ? null : Number(clue.averageRating),
-    ratingCount: Number(clue.ratingCount ?? 0),
-    isBlocked: Boolean(clue.blockedAt),
-    createdAt: clue.createdAt,
-  }));
+  const response = clues.map((clue) =>
+    serializePublicClueSummary(
+      clue,
+      counts.get(clue.id) ?? 0,
+      publicProfiles.get(clue.setterUserId),
+    ),
+  );
   res.json(ListCluesResponse.parse(response));
 });
 
