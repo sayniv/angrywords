@@ -37,11 +37,13 @@ import type {
   CluePublishQuota,
   ClueRatingInput,
   ClueRatingSummary,
+  ClueRecommendation,
   ClueReportResult,
   ClueRetired,
   ClueStartResult,
   Dashboard,
   GetMyActivityParams,
+  GetNextClueRecommendationParams,
   HealthStatus,
   ListCluesParams,
   ProfileInput,
@@ -394,6 +396,90 @@ export function useGetCluePublishQuota<TData = Awaited<ReturnType<typeof getClue
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCluePublishQuotaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetNextClueRecommendationUrl = (params: GetNextClueRecommendationParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/clues/recommendation?${stringifiedParams}` : `/api/clues/recommendation`
+}
+
+/**
+ * @summary Recommend an unsolved playable clue
+ */
+export const getNextClueRecommendation = async (params: GetNextClueRecommendationParams, options?: Parameters<typeof customFetch>[1]): Promise<ClueRecommendation> => {
+
+  return customFetch<ClueRecommendation>(getGetNextClueRecommendationUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNextClueRecommendationQueryKey = (params?: GetNextClueRecommendationParams,) => {
+    return [
+    `/api/clues/recommendation`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetNextClueRecommendationQueryOptions = <TData = Awaited<ReturnType<typeof getNextClueRecommendation>>, TError = ErrorType<void>>(params: GetNextClueRecommendationParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNextClueRecommendation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNextClueRecommendationQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNextClueRecommendation>>> = ({ signal }) => getNextClueRecommendation(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNextClueRecommendation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNextClueRecommendationQueryResult = NonNullable<Awaited<ReturnType<typeof getNextClueRecommendation>>>
+export type GetNextClueRecommendationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Recommend an unsolved playable clue
+ */
+
+export function useGetNextClueRecommendation<TData = Awaited<ReturnType<typeof getNextClueRecommendation>>, TError = ErrorType<void>>(
+ params: GetNextClueRecommendationParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNextClueRecommendation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNextClueRecommendationQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

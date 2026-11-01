@@ -7,6 +7,7 @@ import {
   CreateClueBody,
   CreateClueResponse,
   GetCluePublishQuotaResponse,
+  GetNextClueRecommendationResponse,
   GetClueLeaderboardParams,
   GetClueLeaderboardResponse,
   GetClueParams,
@@ -85,6 +86,8 @@ import { getGuessFeedback } from "../lib/guess-feedback";
 import {
   decodeClueListingCursor,
   encodeClueListingCursor,
+  getClueRecommendationFilter,
+  getClueRecommendationOrder,
   getClueListingPageCondition,
   getClueListingOrder,
   serializePublicClueSummary,
@@ -375,6 +378,71 @@ router.get("/clues", async (req, res): Promise<void> => {
     })
     : null;
   res.json(ListCluesResponse.parse({ items: response, nextCursor }));
+});
+
+router.get("/clues/recommendation", requireAuth, async (req, res): Promise<void> => {
+  const excludeSlug = req.query.excludeSlug;
+  if (typeof excludeSlug !== "string" || excludeSlug.length < 1 || excludeSlug.length > 16) {
+    res.status(400).json({ error: "Choose a clue to exclude from the recommendation." });
+    return;
+  }
+  const userId = getAuth(req).userId!;
+  const ratings = db
+    .select({
+      clueId: clueRatingsTable.clueId,
+      averageRating: avg(clueRatingsTable.rating).as("average_rating"),
+      ratingCount: count().as("rating_count"),
+    })
+    .from(clueRatingsTable)
+    .groupBy(clueRatingsTable.clueId)
+    .as("clue_rating_summary");
+  const ratingCountForSort = sql`coalesce(${ratings.ratingCount}, 0)`;
+  const [candidate] = await db
+    .select({
+      id: cluesTable.id,
+      slug: cluesTable.slug,
+      clue: cluesTable.clue,
+      answer: cluesTable.answer,
+      maxAttempts: cluesTable.maxAttempts,
+      setterUserId: cluesTable.setterUserId,
+      setterName: cluesTable.setterName,
+      blockedAt: cluesTable.blockedAt,
+      createdAt: cluesTable.createdAt,
+      averageRating: ratings.averageRating,
+      ratingCount: ratings.ratingCount,
+    })
+    .from(cluesTable)
+    .leftJoin(ratings, eq(ratings.clueId, cluesTable.id))
+    .where(getClueRecommendationFilter({
+      retiredAt: cluesTable.retiredAt,
+      blockedAt: cluesTable.blockedAt,
+      slug: cluesTable.slug,
+      clueId: cluesTable.id,
+      progressTable: solverProgressTable,
+      progressClueId: solverProgressTable.clueId,
+      progressUserId: solverProgressTable.userId,
+      progressSolvedAt: solverProgressTable.solvedAt,
+    }, excludeSlug, userId))
+    .orderBy(...getClueRecommendationOrder({
+      averageRating: ratings.averageRating,
+      ratingCount: ratingCountForSort,
+      createdAt: cluesTable.createdAt,
+      id: cluesTable.id,
+    }))
+    .limit(1);
+
+  if (!candidate) {
+    res.json(GetNextClueRecommendationResponse.parse({ clue: null }));
+    return;
+  }
+  const [solveCount] = await db
+    .select({ total: count() })
+    .from(solverProgressTable)
+    .where(and(eq(solverProgressTable.clueId, candidate.id), isNotNull(solverProgressTable.solvedAt)));
+  const setterProfile = (await publicProfilesForUsers([candidate.setterUserId])).get(candidate.setterUserId);
+  res.json(GetNextClueRecommendationResponse.parse({
+    clue: serializePublicClueSummary(candidate, Number(solveCount?.total ?? 0), setterProfile),
+  }));
 });
 
 router.get("/clues/publishing-quota", requireAuth, async (req, res): Promise<void> => {

@@ -14,10 +14,11 @@ import {
   Star, Trash2, Trophy, X,
 } from 'lucide-react';
 import {
-  getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey, getMyActivity,
+  getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey, getGetNextClueRecommendationQueryKey, getMyActivity,
   getGetMyProfileQueryKey, getGetCluePublishQuotaQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
   getListPendingClueAppealsQueryKey,
   getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard, useGetCluePublishQuota,
+  useGetNextClueRecommendation,
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   listClues, useRateClue, useReportClue, useRetireClue, useRevealClueHint, useStartClue, useSubmitAttempt, useUpdateMyProfile,
@@ -314,7 +315,7 @@ function AuthFrame({ children }: { children: ReactNode }) {
     <main className="auth-scene paper-grid min-h-[100dvh] px-5 py-10">
       <div className="mx-auto mb-8 flex max-w-5xl items-center justify-between">
         <Brand />
-        <Link href="/" className="text-sm font-semibold text-ink/70 hover:text-tomato">Back to the clues</Link>
+        <BrowseCluesLink className="text-sm font-semibold text-ink/70 hover:text-tomato" testId="link-auth-back-to-clues">Back to the clues</BrowseCluesLink>
       </div>
       <div className="mx-auto grid max-w-5xl items-center gap-12 lg:grid-cols-[1fr_480px]">
         <div className="hidden lg:block">
@@ -413,6 +414,14 @@ export function Header({ active = 'home' }: { active?: 'home' | 'explore' | 'das
   );
 }
 
+export function BrowseCluesLink({ children, className, testId }: {
+  children: ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  return <Link href="/explore" className={className} data-testid={testId}>{children}</Link>;
+}
+
 export function HomePage() {
   const solvers = useGetSolverLeaderboard({ query: { queryKey: getGetSolverLeaderboardQueryKey() } });
   const setters = useGetSetterLeaderboard({ query: { queryKey: getGetSetterLeaderboardQueryKey() } });
@@ -427,7 +436,7 @@ export function HomePage() {
               <h1 className="hero-title">Words with<br /><em>a twist.</em></h1>
               <p className="hero-description">A cryptic clue from a friend. A handful of guesses. Bragging rights that last until the next one.</p>
               <div className="hero-actions">
-                <Link href="/explore" className="button button-primary" data-testid="link-find-clue">Find your first clue <ArrowDownRight size={17} /></Link>
+                <Link href="/explore" className="button button-primary" data-testid="link-find-clue">Explore clues <ArrowDownRight size={17} /></Link>
                 <Link href="/sign-up" className="button button-quiet">Set one for friends <ArrowUpRight size={16} /></Link>
               </div>
               <div className="hero-note"><span className="note-rule" /> Made for the group chat that loves a puzzle.</div>
@@ -1016,11 +1025,11 @@ function ChallengePage() {
   const errorStatus = (error as { status?: number } | null)?.status;
   const blockedError = errorStatus === 410 && apiErrorMessage(error, '').toLowerCase().includes('blocked');
   return <><Header /><main className="page-wrap challenge-page">
-    <Link href="/" className="back-link"><ArrowLeft size={15} /> All clues</Link>
+    <BrowseCluesLink className="back-link" testId="link-challenge-all-clues"><ArrowLeft size={15} /> All clues</BrowseCluesLink>
     {reportNotice && <div className="report-feedback" role="status" data-testid="status-report-success"><Flag size={15} /> {reportNotice}</div>}
     {reportError && <div className="form-error" role="alert" data-testid="status-report-error"><X size={16} /> {reportError}</div>}
     {retiredLocally ? <div className="state-panel"><h2>Clue retired.</h2><p>It no longer accepts guesses. Existing attempts and leaderboard history have been preserved.</p><Link href="/dashboard" className="button button-outline">Back to your page <ArrowRight size={15} /></Link></div> :
-      isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>{errorStatus === 410 ? blockedError ? 'This clue has been blocked.' : 'This clue has been retired.' : 'This clue has slipped away.'}</h2><p>{errorStatus === 410 ? blockedError ? 'It reached 100 community reports and is no longer available. Solve and rating history is preserved.' : 'The setter retired this challenge. Its old shared link is no longer active.' : 'It may have been moved, or the link may be mistyped.'}</p>{errorStatus === 410 ? <Link href="/" className="button button-outline">Browse current clues <ArrowRight size={15} /></Link> : <button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button>}</div> :
+      isLoading ? <ChallengeSkeleton /> : isError || !clue ? <div className="state-panel"><h2>{errorStatus === 410 ? blockedError ? 'This clue has been blocked.' : 'This clue has been retired.' : 'This clue has slipped away.'}</h2><p>{errorStatus === 410 ? blockedError ? 'It reached 100 community reports and is no longer available. Solve and rating history is preserved.' : 'The setter retired this challenge. Its old shared link is no longer active.' : 'It may have been moved, or the link may be mistyped.'}</p>{errorStatus === 410 ? <BrowseCluesLink className="button button-outline" testId="link-challenge-browse-current">Browse current clues <ArrowRight size={15} /></BrowseCluesLink> : <button className="button button-outline" onClick={() => refetch()}>Try again <RotateCcw size={15} /></button>}</div> :
       <div className="challenge-layout">
         <section className="challenge-main">
           <div className="challenge-overline"><span className="eyebrow-dot" /> A CLUE FROM {clue.setterName.toUpperCase()}<span className="challenge-date">{new Date(clue.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><div className="challenge-actions"><button className="share-link-button" data-testid="button-copy-clue-link" onClick={copyChallengeLink} type="button"><Copy size={13} /> {copied ? 'Link copied' : 'Copy challenge link'}</button>{!clue.isOwner && <button className="share-link-button report-button" data-testid="button-report-clue" onClick={() => void handleReport()} type="button" disabled={!authLoaded || reportClue.isPending || clue.userHasReported}><Flag size={13} /> {reportClue.isPending ? 'Reporting…' : clue.userHasReported ? 'Reported' : 'Report'}</button>}</div></div>
@@ -1075,6 +1084,7 @@ function ChallengePage() {
                 </div>
                 {ratingError && <div className="form-error" role="alert" data-testid="status-rating-error">{ratingError}</div>}
               </div>}
+              <NextClueRecommendation successful={visibleResult.correct} slug={slug} />
             </div>
           ) : !persistedStart ? (
             <div className="guess-panel solve-start-panel">
@@ -1148,11 +1158,45 @@ function ChallengePage() {
             retry={() => void refetchLeaderboard()}
           />
           <div className="board-footnote"><span className="board-star"><Sparkles size={18} /></span><span>Fastest time wins.<br />Hint penalties are included.</span></div>
-          <Link href="/" className="board-browse">Browse another clue <ArrowRight size={15} /></Link>
+          <BrowseCluesLink className="board-browse" testId="link-challenge-browse-another">Browse another clue <ArrowRight size={15} /></BrowseCluesLink>
         </aside>
       </div>
     }
   </main><Footer /></>;
+}
+
+export function NextClueRecommendation({ successful, slug }: { successful: boolean; slug: string }) {
+  const recommendation = useGetNextClueRecommendation(
+    { excludeSlug: slug },
+    { query: {
+      queryKey: getGetNextClueRecommendationQueryKey({ excludeSlug: slug }),
+      enabled: successful,
+      staleTime: 15_000,
+    } },
+  );
+  if (!successful) return null;
+  return (
+    <section className="next-clue-panel" data-testid="panel-next-clue">
+      <span className="form-index">KEEP THE SPRINT GOING</span>
+      <h3>Ready for another clue?</h3>
+      {recommendation.data?.clue ? (
+        <BrowseRecommendationLink slug={recommendation.data.clue.slug} />
+      ) : recommendation.isLoading ? (
+        <p>Looking for your next clue…</p>
+      ) : recommendation.isError ? (
+        <p>We couldn’t load a recommendation just now.</p>
+      ) : (
+        <p>You’ve solved every available clue so far.</p>
+      )}
+      <BrowseCluesLink className="text-link" testId="link-explore-after-solve">Explore all clues <ArrowRight size={15} /></BrowseCluesLink>
+    </section>
+  );
+}
+
+function BrowseRecommendationLink({ slug }: { slug: string }) {
+  return <Link href={`/clue/${slug}`} className="button button-primary" data-testid="link-recommended-clue">
+    Try this popular clue <ArrowRight size={16} />
+  </Link>;
 }
 
 function ReviewerGate() {
@@ -1331,12 +1375,12 @@ function DashboardPage() {
       </div>
       <div className="dash-section-heading activity-section-heading">
         <div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR SOLVING NOTEBOOK</div><h2 className="section-title">Pick up where you left off</h2></div>
-        <Link href="/" className="text-link">Find another clue <ArrowRight size={15} /></Link>
+        <BrowseCluesLink className="text-link" testId="link-dashboard-find-another">Find another clue <ArrowRight size={15} /></BrowseCluesLink>
       </div>
       {dashboard.recentActivity.length ? <div className="activity-grid" data-testid="list-solver-activity">
         {allActivity.map((activity) => <ActivityCard key={activity.id} activity={activity} />)}
       </div> : <div className="activity-empty" data-testid="empty-solver-activity">
-        <Feather size={19} /><span>No clues started yet. Browse the board and find one to solve.</span><Link href="/" className="text-link">Browse clues <ArrowRight size={15} /></Link>
+        <Feather size={19} /><span>No clues started yet. Browse the board and find one to solve.</span><BrowseCluesLink className="text-link" testId="link-dashboard-browse-clues">Browse clues <ArrowRight size={15} /></BrowseCluesLink>
       </div>}
       {dashboard.hasMoreActivity && (!olderActivity.data || olderActivity.hasNextPage) && <div className="activity-load-more">
         {olderActivity.isFetchNextPageError && <span className="activity-load-error" role="alert">Older activity could not be loaded. Try again.</span>}
@@ -1350,7 +1394,7 @@ function DashboardPage() {
           {olderActivity.isFetchingNextPage ? 'Loading older activity…' : olderActivity.isFetchNextPageError ? 'Try again' : 'Load older activity'} <ArrowDownRight size={15} />
         </button>
       </div>}
-      <div className="dash-section-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR RECENT CLUES</div><h2 className="section-title">The ones you put out there</h2></div><Link href="/" className="text-link">Browse the whole board <ArrowRight size={15} /></Link></div>
+      <div className="dash-section-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR RECENT CLUES</div><h2 className="section-title">The ones you put out there</h2></div><BrowseCluesLink className="text-link" testId="link-dashboard-whole-board">Browse the whole board <ArrowRight size={15} /></BrowseCluesLink></div>
       {dashboard.recentClues.length ? <div className="clue-grid dashboard-grid">{dashboard.recentClues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}</div> : <div className="empty-clues dash-empty"><div className="empty-stamp"><Feather size={27} /></div><div><h3>Your setter's notebook is blank.</h3><p>Write a clue, then see who can crack it.</p></div><Link href="/create" className="button button-primary">Write your first clue <ArrowRight size={15} /></Link></div>}
       <div className="dash-note"><span><Sparkles size={17} /></span><p>Every new clue starts its own race. Share the link and let the solving begin.</p><Link href="/create">Make another <ArrowUpRight size={15} /></Link></div>
       <div className="reviewer-link-wrap"><Link href="/review" className="text-link" data-testid="link-review-appeals">Open the reviewer queue <ArrowRight size={15} /></Link></div>

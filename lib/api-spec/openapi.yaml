@@ -101,6 +101,32 @@ paths:
                 $ref: "#/components/schemas/CluePublishQuota"
         "401":
           description: Sign in to view publication quota
+  /clues/recommendation:
+    get:
+      operationId: getNextClueRecommendation
+      tags: [clues]
+      summary: Recommend an unsolved playable clue
+      security:
+        - clerkSession: []
+      parameters:
+        - name: excludeSlug
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 16
+      responses:
+        "200":
+          description: The most popular eligible clue, if one remains
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRecommendation"
+        "400":
+          description: Invalid clue recommendation request
+        "401":
+          description: Sign in to get a clue recommendation
   /clues/{slug}:
     get:
       operationId: getClue
@@ -673,6 +699,14 @@ components:
           items:
             $ref: "#/components/schemas/ClueSummary"
         nextCursor: { type: ["string", "null"] }
+    ClueRecommendation:
+      type: object
+      required: [clue]
+      properties:
+        clue:
+          oneOf:
+            - $ref: "#/components/schemas/ClueSummary"
+            - type: "null"
     ClueInput:
       type: object
       required: [clue, answer, wordplay, maxAttempts]

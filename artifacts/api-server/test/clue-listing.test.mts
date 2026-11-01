@@ -5,12 +5,14 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import {
   decodeClueListingCursor,
   encodeClueListingCursor,
+  getClueRecommendationFilter,
+  getClueRecommendationOrder,
   getClueListingCursorCondition,
   getClueListingPageCondition,
   getClueListingOrder,
   type ClueListingCursor,
 } from "../src/lib/clue-listing.ts";
-import { ListCluesResponse } from "@workspace/api-zod";
+import { GetNextClueRecommendationResponse, ListCluesResponse } from "@workspace/api-zod";
 
 const dialect = new PgDialect();
 const cursor: ClueListingCursor = {
@@ -47,6 +49,66 @@ test("listing order includes deterministic tie-breakers for every page boundary"
     popularSql,
     /"ratings"\."average_rating" DESC NULLS LAST, coalesce\("ratings"\."rating_count", 0\) desc, "clues"\."created_at" desc, "clues"\."id" desc/i,
   );
+});
+
+test("recommendations exclude the current clue, unavailable clues, and prior successful solves", () => {
+  const filter = dialect.sqlToQuery(getClueRecommendationFilter({
+    retiredAt: sql`"clues"."retired_at"`,
+    blockedAt: sql`"clues"."blocked_at"`,
+    slug: sql`"clues"."slug"`,
+    clueId: sql`"clues"."id"`,
+    progressTable: sql`"solver_progress"`,
+    progressClueId: sql`"solver_progress"."clue_id"`,
+    progressUserId: sql`"solver_progress"."user_id"`,
+    progressSolvedAt: sql`"solver_progress"."solved_at"`,
+  }, "current-clue", "member-123"));
+
+  assert.match(filter.sql, /"clues"\."retired_at" is null/i);
+  assert.match(filter.sql, /"clues"\."blocked_at" is null/i);
+  assert.match(filter.sql, /"clues"\."slug" <> /i);
+  assert.match(filter.sql, /not exists\s*\(\s*select 1 from "solver_progress"/i);
+  assert.match(filter.sql, /"solver_progress"\."clue_id" = "clues"\."id"/i);
+  assert.match(filter.sql, /"solver_progress"\."user_id" = /i);
+  assert.match(filter.sql, /"solver_progress"\."solved_at" is not null/i);
+  assert.ok(filter.params.includes("current-clue"));
+  assert.ok(filter.params.includes("member-123"));
+});
+
+test("recommendations preserve the catalog popularity order including stable rating ties", () => {
+  const order = dialect.sqlToQuery(sql.join(getClueRecommendationOrder({
+    averageRating: sql`"ratings"."average_rating"`,
+    ratingCount: sql`coalesce("ratings"."rating_count", 0)`,
+    createdAt: sql`"clues"."created_at"`,
+    id: sql`"clues"."id"`,
+  }), sql`, `));
+
+  assert.match(
+    order.sql,
+    /"ratings"\."average_rating" DESC NULLS LAST, coalesce\("ratings"\."rating_count", 0\) desc, "clues"\."created_at" desc, "clues"\."id" desc/i,
+  );
+});
+
+test("recommendation response supports an empty catalog and only exposes public summaries", () => {
+  assert.deepEqual(GetNextClueRecommendationResponse.parse({ clue: null }), { clue: null });
+  const result = GetNextClueRecommendationResponse.parse({
+    clue: {
+      id: 24,
+      slug: "popular-clue",
+      clue: "A public clue",
+      answerLength: 5,
+      maxAttempts: 5,
+      setterName: "PuzzleFriend",
+      setterBlurb: null,
+      solveCount: 2,
+      averageRating: 4.5,
+      ratingCount: 3,
+      isBlocked: false,
+      createdAt: "2026-11-01T12:00:00.000Z",
+      answer: "SECRET",
+    },
+  });
+  assert.equal(result.clue?.slug, "popular-clue");
+  assert.equal(Object.hasOwn(result.clue ?? {}, "answer"), false);
 });
 
 test("rating cursors continue through equal-rating ties and the unrated tail", () => {

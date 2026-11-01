@@ -92,6 +92,10 @@ export interface ClueCatalogPage {
   nextCursor: string | null;
 }
 
+export interface ClueRecommendation {
+  clue: ClueSummary | null;
+}
+
 export interface ClueInput {
   /**
      * @minLength 4
@@ -386,6 +390,14 @@ export const ListCluesSort = {
   newest: 'newest',
   rating: 'rating',
 } as const;
+
+export type GetNextClueRecommendationParams = {
+/**
+ * @minLength 1
+ * @maxLength 16
+ */
+excludeSlug: string;
+};
 
 export type GetMyActivityParams = {
 /**

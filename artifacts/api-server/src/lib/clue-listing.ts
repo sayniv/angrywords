@@ -1,7 +1,33 @@
-import { and, desc, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, desc, isNull, ne, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 export function getPlayableClueFilter(retiredAt: SQLWrapper, blockedAt: SQLWrapper) {
   return and(isNull(retiredAt), isNull(blockedAt));
+}
+
+export function getClueRecommendationFilter(
+  fields: {
+    retiredAt: SQLWrapper;
+    blockedAt: SQLWrapper;
+    slug: SQLWrapper;
+    clueId: SQLWrapper;
+    progressTable: SQLWrapper;
+    progressClueId: SQLWrapper;
+    progressUserId: SQLWrapper;
+    progressSolvedAt: SQLWrapper;
+  },
+  excludeSlug: string,
+  userId: string,
+) {
+  return and(
+    getPlayableClueFilter(fields.retiredAt, fields.blockedAt),
+    ne(fields.slug, excludeSlug),
+    sql`NOT EXISTS (
+      SELECT 1 FROM ${fields.progressTable}
+      WHERE ${fields.progressClueId} = ${fields.clueId}
+        AND ${fields.progressUserId} = ${userId}
+        AND ${fields.progressSolvedAt} IS NOT NULL
+    )`,
+  );
 }
 
 export function getClueListingPageCondition(
@@ -42,6 +68,15 @@ export function getClueListingOrder(
     ];
   }
   return [desc(fields.createdAt), desc(fields.id)];
+}
+
+export function getClueRecommendationOrder(fields: {
+  averageRating: SQLWrapper;
+  ratingCount: SQLWrapper;
+  createdAt: SQLWrapper;
+  id: SQLWrapper;
+}): SQL[] {
+  return getClueListingOrder(true, fields);
 }
 
 export type ClueListingSort = "newest" | "rating";

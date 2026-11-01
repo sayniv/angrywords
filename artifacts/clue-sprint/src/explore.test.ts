@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Router } from 'wouter';
-import App, { ExplorePage, Header, HomePage } from './App';
+import App, { BrowseCluesLink, ExplorePage, Header, HomePage, NextClueRecommendation } from './App';
 
 const api = vi.hoisted(() => ({
   listClues: vi.fn(),
@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   getClue: vi.fn(),
   clueLeaderboard: vi.fn(),
   mutation: vi.fn(),
+  nextRecommendation: vi.fn(),
 }));
 
 vi.mock('@clerk/react', () => ({
@@ -37,6 +38,7 @@ vi.mock('@workspace/api-client-react', () => ({
   getGetClueLeaderboardQueryKey: (slug: string) => ['clue-leaderboard', slug],
   getGetMyDashboardQueryKey: () => ['dashboard'],
   getGetMyProfileQueryKey: () => ['profile'],
+  getGetNextClueRecommendationQueryKey: (params: unknown) => ['recommendation', params],
   getGetSolverLeaderboardQueryKey: () => ['solver-leaderboard'],
   getGetSetterLeaderboardQueryKey: () => ['setter-leaderboard'],
   getListCluesQueryKey: (params?: unknown) => ['clues', params],
@@ -54,6 +56,7 @@ vi.mock('@workspace/api-client-react', () => ({
   useSubmitClueAppeal: api.mutation,
   useGetSolverLeaderboard: api.solverLeaderboard,
   useGetSetterLeaderboard: api.setterLeaderboard,
+  useGetNextClueRecommendation: api.nextRecommendation,
 }));
 
 function renderWithRouter(element: ReactNode) {
@@ -176,8 +179,70 @@ describe('Home and Explore destinations', () => {
 
     expect(screen.getByRole('heading', { name: /Words witha twist/i })).toBeTruthy();
     expect(screen.getByTestId('link-find-clue').getAttribute('href')).toBe('/explore');
+    expect(screen.getByTestId('link-find-clue').textContent).toContain('Explore clues');
     expect(screen.queryByTestId('card-clue-1')).toBeNull();
     expect(api.listClues).not.toHaveBeenCalled();
+  });
+
+  it('routes clue-browse links from challenge and dashboard copy to the catalog', () => {
+    renderWithRouter(createElement('div', null,
+      createElement(BrowseCluesLink, { testId: 'link-auth-back-to-clues' }, 'Back to the clues'),
+      createElement(BrowseCluesLink, { testId: 'link-challenge-all-clues' }, 'All clues'),
+      createElement(BrowseCluesLink, { testId: 'link-challenge-browse-another' }, 'Browse another clue'),
+      createElement(BrowseCluesLink, { testId: 'link-dashboard-browse-clues' }, 'Browse clues'),
+      createElement(BrowseCluesLink, { testId: 'link-dashboard-whole-board' }, 'Browse the whole board'),
+    ));
+
+    for (const id of [
+      'link-auth-back-to-clues',
+      'link-challenge-all-clues',
+      'link-challenge-browse-another',
+      'link-dashboard-browse-clues',
+      'link-dashboard-whole-board',
+    ]) {
+      expect(screen.getByTestId(id).getAttribute('href')).toBe('/explore');
+    }
+  });
+
+  it('offers a recommendation only for successful solves and always keeps Explore available', () => {
+    api.nextRecommendation.mockReturnValue({
+      data: { clue: clue(12) },
+      isLoading: false,
+      isError: false,
+    });
+    const failedSolve = renderWithRouter(createElement(NextClueRecommendation, { successful: false, slug: 'current-clue' }));
+    expect(screen.queryByTestId('panel-next-clue')).toBeNull();
+    expect(api.nextRecommendation).toHaveBeenCalledWith(
+      { excludeSlug: 'current-clue' },
+      { query: { queryKey: ['recommendation', { excludeSlug: 'current-clue' }], enabled: false, staleTime: 15_000 } },
+    );
+    failedSolve.unmount();
+
+    api.nextRecommendation.mockReturnValue({
+      data: { clue: clue(12) },
+      isLoading: false,
+      isError: false,
+    });
+    renderWithRouter(createElement(NextClueRecommendation, { successful: true, slug: 'current-clue' }));
+    expect(screen.getByTestId('link-recommended-clue').getAttribute('href')).toBe('/clue/clue-12');
+    expect(screen.getByTestId('link-explore-after-solve').getAttribute('href')).toBe('/explore');
+    expect(api.nextRecommendation).toHaveBeenLastCalledWith(
+      { excludeSlug: 'current-clue' },
+      { query: { queryKey: ['recommendation', { excludeSlug: 'current-clue' }], enabled: true, staleTime: 15_000 } },
+    );
+  });
+
+  it('shows an Explore fallback when the recommendation is unavailable or fails to load', () => {
+    api.nextRecommendation.mockReturnValue({ data: { clue: null }, isLoading: false, isError: false });
+    const empty = renderWithRouter(createElement(NextClueRecommendation, { successful: true, slug: 'current-clue' }));
+    expect(screen.getByText('You’ve solved every available clue so far.')).toBeTruthy();
+    expect(screen.getByTestId('link-explore-after-solve').getAttribute('href')).toBe('/explore');
+    empty.unmount();
+
+    api.nextRecommendation.mockReturnValue({ isLoading: false, isError: true });
+    renderWithRouter(createElement(NextClueRecommendation, { successful: true, slug: 'current-clue' }));
+    expect(screen.getByText('We couldn’t load a recommendation just now.')).toBeTruthy();
+    expect(screen.getByTestId('link-explore-after-solve').getAttribute('href')).toBe('/explore');
   });
 
   it('renders the first clue page and keeps cards linked to their challenges', () => {

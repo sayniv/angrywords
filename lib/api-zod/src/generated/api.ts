@@ -122,6 +122,35 @@ export const GetCluePublishQuotaResponse = zod.object({
 
 
 /**
+ * @summary Recommend an unsolved playable clue
+ */
+export const getNextClueRecommendationQueryExcludeSlugMax = 16;
+
+
+
+export const GetNextClueRecommendationQueryParams = zod.object({
+  "excludeSlug": zod.coerce.string().min(1).max(getNextClueRecommendationQueryExcludeSlugMax)
+})
+
+export const GetNextClueRecommendationResponse = zod.object({
+  "clue": zod.union([zod.object({
+  "id": zod.number().int(),
+  "slug": zod.string(),
+  "clue": zod.string(),
+  "answerLength": zod.number().int(),
+  "maxAttempts": zod.number().int(),
+  "setterName": zod.string(),
+  "setterBlurb": zod.string().nullable(),
+  "solveCount": zod.number().int(),
+  "averageRating": zod.number().nullable(),
+  "ratingCount": zod.number().int(),
+  "isBlocked": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}),zod.null()])
+})
+
+
+/**
  * @summary Get a shared clue challenge
  */
 export const GetClueParams = zod.object({

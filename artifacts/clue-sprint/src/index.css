@@ -254,6 +254,10 @@
 .setter-blurb-detail { margin-top: 16px; padding: 15px 17px; background: #f1eee4; border-left: 2px solid var(--sage); }
 .setter-blurb-detail p { margin: 6px 0 0; color: #675f54; font-size: 12px; line-height: 1.7; }
 .rating-panel { margin-top: 19px; padding: 19px; background: #f7f1e5; border: 1px solid #e5d7bf; }
+.next-clue-panel { display: grid; justify-items: center; gap: 9px; margin-top: 18px; padding: 19px; background: #fffaf0; border: 1px solid #e5d7bf; text-align: center; }
+.next-clue-panel h3 { margin: 0; font: 600 22px var(--app-font-serif); }
+.next-clue-panel p { margin: 0; color: #75685e; font-size: 12px; }
+.next-clue-panel .text-link { font-size: 12px; }
 .rating-panel h3 { margin: 6px 0 2px; font: 600 22px var(--app-font-serif); }
 .rating-panel > p { margin: 0; color: #7c7063; font-size: 11px; }
 .rating-stars { display: flex; gap: 8px; margin-top: 12px; }
