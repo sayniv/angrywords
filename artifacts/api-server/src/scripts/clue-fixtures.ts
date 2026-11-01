@@ -6,6 +6,7 @@ import {
   clueFixtureDefinitions,
   getClueFixtureSlug,
   getClueFixtureSlugPrefix,
+  selectManagedClueFixtures,
 } from "../lib/clue-test-fixtures";
 
 type Operation = "seed" | "cleanup";
@@ -47,13 +48,18 @@ async function run(): Promise<void> {
       const now = new Date();
       const result = await db.transaction(async (tx) => {
         const prefixMatches = await tx
-          .select({ id: cluesTable.id, slug: cluesTable.slug, clue: cluesTable.clue })
+          .select({
+            id: cluesTable.id,
+            slug: cluesTable.slug,
+            clue: cluesTable.clue,
+            setterUserId: cluesTable.setterUserId,
+          })
           .from(cluesTable)
           .where(and(
             eq(cluesTable.setterUserId, userId),
             like(cluesTable.slug, `${slugPrefix}%`),
           ));
-        const fixtureMatches = prefixMatches.filter(({ clue }) => clue.startsWith(CLUE_FIXTURE_MARKER));
+        const fixtureMatches = selectManagedClueFixtures(prefixMatches, userId);
         if (prefixMatches.length !== fixtureMatches.length) {
           throw new Error("A non-fixture clue uses this account's fixture slug prefix; no rows were changed.");
         }
@@ -104,15 +110,18 @@ async function run(): Promise<void> {
     const slugPrefix = getClueFixtureSlugPrefix(userId);
     const result = await db.transaction(async (tx) => {
       const prefixMatches = await tx
-        .select({ id: cluesTable.id, clue: cluesTable.clue })
+        .select({
+          id: cluesTable.id,
+          slug: cluesTable.slug,
+          clue: cluesTable.clue,
+          setterUserId: cluesTable.setterUserId,
+        })
         .from(cluesTable)
         .where(and(
           eq(cluesTable.setterUserId, userId),
           like(cluesTable.slug, `${slugPrefix}%`),
         ));
-      const fixtureIds = prefixMatches
-        .filter(({ clue }) => clue.startsWith(CLUE_FIXTURE_MARKER))
-        .map(({ id }) => id);
+      const fixtureIds = selectManagedClueFixtures(prefixMatches, userId).map(({ id }) => id);
       if (!fixtureIds.length) return { clueCount: 0 };
       await tx.delete(cluesTable).where(inArray(cluesTable.id, fixtureIds));
       return { clueCount: fixtureIds.length };
