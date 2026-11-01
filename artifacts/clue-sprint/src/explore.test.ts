@@ -195,6 +195,41 @@ describe('Home and Explore destinations', () => {
     }));
   });
 
+  it('preserves API order for equally rated clues and consistently places unrated clues last', () => {
+    const sameDate = '2026-11-01T12:00:00.000Z';
+    const ratedHighId = { ...clue(40), averageRating: 4.5, ratingCount: 5, createdAt: sameDate };
+    const ratedLowId = { ...clue(30), averageRating: 4.5, ratingCount: 5, createdAt: sameDate };
+    const ratedFewerRatings = { ...clue(50), averageRating: 4.5, ratingCount: 2, createdAt: sameDate };
+    const unratedNewer = { ...clue(70), createdAt: '2026-11-02T12:00:00.000Z' };
+    const unratedHighId = { ...clue(55), createdAt: sameDate };
+    const unratedLowId = { ...clue(54), createdAt: sameDate };
+    setupClueQuery({
+      data: {
+        pages: [
+          { items: [ratedHighId, ratedLowId], nextCursor: 'next-page' },
+          { items: [ratedFewerRatings, unratedNewer, unratedHighId, unratedLowId], nextCursor: null },
+        ],
+      },
+    });
+
+    renderAppAt('/explore/popular');
+
+    expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
+      .toEqual([
+        'card-clue-40',
+        'card-clue-30',
+        'card-clue-50',
+        'card-clue-70',
+        'card-clue-55',
+        'card-clue-54',
+      ]);
+    expect(screen.getByTestId('text-clue-rating-70').textContent).toContain('Not rated yet');
+    expect(screen.getByTestId('text-clue-rating-55').textContent).toContain('Not rated yet');
+    expect(api.infiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ['clues', { sort: 'rating' }],
+    }));
+  });
+
   it('keeps the selected view and ordering through browser back and forward', async () => {
     api.infiniteQuery.mockImplementation((options: { queryKey: [string, { sort: 'newest' | 'rating' }] }) => ({
       data: { pages: [{

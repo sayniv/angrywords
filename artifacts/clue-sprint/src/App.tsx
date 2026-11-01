@@ -483,6 +483,7 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 15_000,
   });
+  // The API owns catalog ordering; flatten pages without re-sorting cursor results.
   const clues = cluesQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const isPopular = sort === 'rating';
   return (

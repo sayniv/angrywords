@@ -14,6 +14,8 @@ export function getClueListingOrder(
   },
 ): SQL[] {
   if (sortByRating) {
+    // Popular order is average rating (unrated last), rating count, newest clue,
+    // then highest ID. The final fields make ties stable across page requests.
     return [
       sql`${fields.averageRating} DESC NULLS LAST`,
       desc(fields.ratingCount),

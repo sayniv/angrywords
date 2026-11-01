@@ -42,39 +42,46 @@ test("listing order includes deterministic tie-breakers for every page boundary"
   assert.match(newestSql, /"clues"\."created_at" desc, "clues"\."id" desc/i);
 
   const popularSql = dialect.sqlToQuery(sql.join(getClueListingOrder(true, fields), sql`, `)).sql;
-  assert.match(popularSql, /"ratings"\."average_rating" DESC NULLS LAST/);
-  assert.match(popularSql, /coalesce\("ratings"\."rating_count", 0\) desc/i);
-  assert.match(popularSql, /"clues"\."created_at" desc/i);
-  assert.match(popularSql, /"clues"\."id" desc/i);
+  assert.match(
+    popularSql,
+    /"ratings"\."average_rating" DESC NULLS LAST, coalesce\("ratings"\."rating_count", 0\) desc, "clues"\."created_at" desc, "clues"\."id" desc/i,
+  );
 });
 
-test("rating cursors continue across unrated clues and preserve timestamp precision", () => {
-  const condition = dialect.sqlToQuery(getClueListingCursorCondition(
+test("rating cursors continue through equal-rating ties and the unrated tail", () => {
+  const fields = {
+    averageRating: sql`"ratings"."average_rating"`,
+    ratingCount: sql`coalesce("ratings"."rating_count", 0)`,
+    createdAt: sql`"clues"."created_at"`,
+    id: sql`"clues"."id"`,
+  };
+  const equalRatingCondition = dialect.sqlToQuery(getClueListingCursorCondition(
+    cursor,
+    fields,
+  ));
+  assert.match(equalRatingCondition.sql, /"ratings"\."average_rating" = \$\d+/);
+  assert.match(equalRatingCondition.sql, /coalesce\("ratings"\."rating_count", 0\) < \$\d+/);
+  assert.match(equalRatingCondition.sql, /"clues"\."created_at" < /);
+  assert.match(equalRatingCondition.sql, /"clues"\."id" < /);
+  assert.ok(equalRatingCondition.params.includes(cursor.averageRating));
+  assert.ok(equalRatingCondition.params.includes(cursor.ratingCount));
+
+  const unratedCondition = dialect.sqlToQuery(getClueListingCursorCondition(
     { ...cursor, averageRating: null, ratingCount: 0 },
-    {
-      averageRating: sql`"ratings"."average_rating"`,
-      ratingCount: sql`coalesce("ratings"."rating_count", 0)`,
-      createdAt: sql`"clues"."created_at"`,
-      id: sql`"clues"."id"`,
-    },
+    fields,
   ));
 
-  assert.match(condition.sql, /"ratings"\."average_rating" is null/i);
-  assert.match(condition.sql, /coalesce\("ratings"\."rating_count", 0\) < \$1/);
-  assert.match(condition.sql, /"clues"\."created_at" < /);
-  assert.match(condition.sql, /"clues"\."id" < /);
-  assert.equal(condition.params[0], 0);
-  assert.ok(condition.params.includes("2026-11-01T12:00:00.000Z"));
+  assert.match(unratedCondition.sql, /"ratings"\."average_rating" is null/i);
+  assert.match(unratedCondition.sql, /coalesce\("ratings"\."rating_count", 0\) < \$1/);
+  assert.match(unratedCondition.sql, /"clues"\."created_at" < /);
+  assert.match(unratedCondition.sql, /"clues"\."id" < /);
+  assert.equal(unratedCondition.params[0], 0);
+  assert.ok(unratedCondition.params.includes("2026-11-01T12:00:00.000Z"));
 
   const preciseTimestamp = "2026-11-01T12:00:00.123456Z";
   const preciseCondition = dialect.sqlToQuery(getClueListingCursorCondition(
     { ...cursor, sort: "newest", createdAt: preciseTimestamp },
-    {
-      averageRating: sql`"ratings"."average_rating"`,
-      ratingCount: sql`coalesce("ratings"."rating_count", 0)`,
-      createdAt: sql`"clues"."created_at"`,
-      id: sql`"clues"."id"`,
-    },
+    fields,
   ));
   assert.ok(preciseCondition.params.includes(preciseTimestamp));
 });
