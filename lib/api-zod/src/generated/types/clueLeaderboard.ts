@@ -8,6 +8,7 @@
 import type { LeaderboardEntry } from './leaderboardEntry';
 
 export interface ClueLeaderboard {
-  noHints: LeaderboardEntry[];
-  hintsUsed: LeaderboardEntry[];
+  noHintsNoAssist: LeaderboardEntry[];
+  hintsUsedNoAssist: LeaderboardEntry[];
+  assistUsed: LeaderboardEntry[];
 }

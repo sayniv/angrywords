@@ -18,6 +18,7 @@ import {
   ListCluesResponse,
   DeleteMyAccountBody,
   RetireClueParams,
+  StartClueBody,
   StartClueParams,
   StartClueResponse,
   SubmitAttemptBody,
@@ -78,6 +79,7 @@ import {
   serializeSolverActivity,
 } from "../lib/solver-activity";
 import { buildClueLeaderboardEntries } from "../lib/clue-leaderboard";
+import { getGuessFeedback } from "../lib/guess-feedback";
 
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
@@ -473,6 +475,7 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
     userCompleted: null,
     userElapsedSeconds: null,
     userStartedAt: null,
+    userAssistEnabled: null,
     userSolved: null,
     revealedAnswer: clue.answer,
     userRevealedHints: [],
@@ -643,6 +646,7 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     userCompleted: progressState.userCompleted,
     userElapsedSeconds: currentElapsed,
     userStartedAt: progress?.startedAt ?? null,
+    userAssistEnabled: progress?.assistEnabled ?? null,
     userSolved: progressState.userSolved,
     userRevealedHints: progress
       ? getPreviouslyRevealedHints(clue.hints, progress.hintsRevealed)
@@ -1062,13 +1066,14 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
     });
     return;
   }
-  const selectLeaderboardRows = (hasHints: boolean) =>
+  const selectLeaderboardRows = (category: "noHintsNoAssist" | "hintsUsedNoAssist" | "assistUsed") =>
     db
       .select({
         userId: solverProgressTable.userId,
         elapsedSeconds: solverProgressTable.elapsedSeconds,
         attemptsUsed: solverProgressTable.attemptsUsed,
         hintsRevealed: solverProgressTable.hintsRevealed,
+        assistEnabled: solverProgressTable.assistEnabled,
         solvedAt: solverProgressTable.solvedAt,
         failedAt: solverProgressTable.failedAt,
       })
@@ -1078,9 +1083,14 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
           eq(solverProgressTable.clueId, clue.id),
           isNotNull(solverProgressTable.solvedAt),
           isNull(solverProgressTable.failedAt),
-          hasHints
-            ? gt(solverProgressTable.hintsRevealed, 0)
-            : eq(solverProgressTable.hintsRevealed, 0),
+          category === "assistUsed"
+            ? eq(solverProgressTable.assistEnabled, true)
+            : and(
+                eq(solverProgressTable.assistEnabled, false),
+                category === "hintsUsedNoAssist"
+                  ? gt(solverProgressTable.hintsRevealed, 0)
+                  : eq(solverProgressTable.hintsRevealed, 0),
+              ),
         ),
       )
       .orderBy(
@@ -1089,11 +1099,12 @@ router.get("/clues/:slug/leaderboard", async (req, res): Promise<void> => {
         asc(solverProgressTable.solvedAt),
       )
       .limit(50);
-  const [noHintRows, hintRows] = await Promise.all([
-    selectLeaderboardRows(false),
-    selectLeaderboardRows(true),
+  const [noHintRows, hintRows, assistRows] = await Promise.all([
+    selectLeaderboardRows("noHintsNoAssist"),
+    selectLeaderboardRows("hintsUsedNoAssist"),
+    selectLeaderboardRows("assistUsed"),
   ]);
-  const rows = [...noHintRows, ...hintRows];
+  const rows = [...noHintRows, ...hintRows, ...assistRows];
   const publicIds = await publicIdsForUsers(rows.map((row) => row.userId));
   const entries = buildClueLeaderboardEntries(rows, publicIds);
   res.json(GetClueLeaderboardResponse.parse(entries));
@@ -1104,8 +1115,13 @@ router.post(
   requireAuth,
   async (req, res): Promise<void> => {
     const params = StartClueParams.safeParse(req.params);
+    const body = StartClueBody.safeParse(req.body ?? {});
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
+      return;
+    }
+    if (!body.success) {
+      res.status(400).json({ error: body.error.message });
       return;
     }
     const [clue] = await db
@@ -1143,6 +1159,7 @@ router.post(
         clueId: clue.id,
         userId,
         displayName: profile.publicId,
+        assistEnabled: body.data.assistEnabled,
       })
       .onConflictDoNothing({
         target: [solverProgressTable.clueId, solverProgressTable.userId],
@@ -1163,6 +1180,7 @@ router.post(
         completed,
         elapsedSeconds,
         startedAt: progress.startedAt,
+        assistEnabled: progress.assistEnabled,
       }),
     );
   },
@@ -1276,6 +1294,9 @@ router.post(
           : completed
             ? "That was the final attempt. The solution is now revealed."
             : "Not quite. Try another answer.",
+        ...(progress.assistEnabled
+          ? { feedback: getGuessFeedback(normalizeAnswer(parsed.data.answer), clue.normalizedAnswer) }
+          : {}),
       };
     });
 

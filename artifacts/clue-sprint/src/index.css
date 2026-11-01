@@ -637,6 +637,16 @@
 .guess-entry { display: flex; gap: 8px; }
 .guess-entry input { font-size: 14px; }
 .guess-entry .button { flex: 0 0 auto; }
+.solve-start-panel > .button { margin-top: 17px; }
+.assist-choice { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 15px; color: var(--ink); background: #f7f1e5; border: 1px solid #e5d7bf; cursor: pointer; }
+.assist-choice input { width: 18px; height: 18px; flex: 0 0 auto; margin: 2px 0 0; accent-color: var(--sage); }
+.assist-choice span { display: grid; gap: 4px; }
+.assist-choice strong { font: 600 14px var(--app-font-sans); }
+.assist-choice small { color: var(--quiet); font-size: 11px; line-height: 1.5; }
+.guess-feedback { display: flex; flex-wrap: wrap; gap: 5px; margin: 16px 0 0; padding: 0; list-style: none; }
+.guess-feedback-tile { display: grid; place-items: center; width: 39px; height: 42px; color: var(--ink); background: #eee9df; border: 1px solid #d7ccbb; border-radius: 4px; font: 600 18px var(--app-font-mono); text-transform: uppercase; }
+.guess-feedback-tile.feedback-green { color: #fff; background: #47745e; border-color: #47745e; }
+.guess-feedback-tile.feedback-yellow { color: #382c24; background: #eac858; border-color: #d8b33d; }
 .guess-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: #897b6d; font: 10px var(--app-font-mono); }
 .give-up-row { display: flex; justify-content: flex-end; margin-top: 14px; }
 .attempt-dots { display: flex; gap: 5px; }

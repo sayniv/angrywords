@@ -3,6 +3,7 @@ export interface ClueLeaderboardRow {
   elapsedSeconds: number | null;
   attemptsUsed: number;
   hintsRevealed: number;
+  assistEnabled: boolean;
   solvedAt: Date | null;
   failedAt: Date | null;
 }
@@ -16,8 +17,9 @@ interface ClueLeaderboardEntry {
 }
 
 export interface ClueLeaderboardEntries {
-  noHints: ClueLeaderboardEntry[];
-  hintsUsed: ClueLeaderboardEntry[];
+  noHintsNoAssist: ClueLeaderboardEntry[];
+  hintsUsedNoAssist: ClueLeaderboardEntry[];
+  assistUsed: ClueLeaderboardEntry[];
 }
 
 function compareSolves(left: ClueLeaderboardRow, right: ClueLeaderboardRow): number {
@@ -37,9 +39,16 @@ export function buildClueLeaderboardEntries(
   publicIds: Map<string, string>,
 ): ClueLeaderboardEntries {
   const eligible = rows.filter((row) => row.solvedAt !== null && row.failedAt === null);
-  const buildCategory = (hasHints: boolean): ClueLeaderboardEntry[] =>
+  const buildCategory = (
+    category: "noHintsNoAssist" | "hintsUsedNoAssist" | "assistUsed",
+  ): ClueLeaderboardEntry[] =>
     eligible
-      .filter((row) => (row.hintsRevealed > 0) === hasHints)
+      .filter((row) =>
+        category === "assistUsed"
+          ? row.assistEnabled
+          : !row.assistEnabled &&
+            (row.hintsRevealed > 0) === (category === "hintsUsedNoAssist"),
+      )
       .sort(compareSolves)
       .slice(0, 50)
       .map((row, index) => ({
@@ -51,7 +60,8 @@ export function buildClueLeaderboardEntries(
       }));
 
   return {
-    noHints: buildCategory(false),
-    hintsUsed: buildCategory(true),
+    noHintsNoAssist: buildCategory("noHintsNoAssist"),
+    hintsUsedNoAssist: buildCategory("hintsUsedNoAssist"),
+    assistUsed: buildCategory("assistUsed"),
   };
 }

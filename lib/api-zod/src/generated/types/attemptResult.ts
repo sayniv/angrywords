@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AttemptResultFeedbackItem } from './attemptResultFeedbackItem';
 
 export interface AttemptResult {
   correct: boolean;
@@ -13,4 +14,5 @@ export interface AttemptResult {
   completed: boolean;
   elapsedSeconds: number;
   message?: string;
+  feedback?: AttemptResultFeedbackItem[];
 }

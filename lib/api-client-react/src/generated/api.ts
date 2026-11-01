@@ -47,6 +47,7 @@ import type {
   ProfileInput,
   PublicProfile,
   SetterLeaderboardEntry,
+  SolveModeInput,
   SolverActivityPage,
   SolverLeaderboardEntry
 } from './api.schemas';
@@ -1305,14 +1306,29 @@ export const getStartClueUrl = (slug: string,) => {
 /**
  * @summary Start or resume a clue challenge
  */
-export const startClue = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<ClueStartResult> => {
+export const startClue = async (slug: string,
+    solveModeInput?: SolveModeInput, options?: Parameters<typeof customFetch>[1]): Promise<ClueStartResult> => {
 
-  return customFetch<ClueStartResult>(getStartClueUrl(slug),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ClueStartResult>(getStartClueUrl(slug),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(solveModeInput)
   }
 );}
 
@@ -1337,9 +1353,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof startClue>>, StartClueMutationVariables> = (props) => {
-          const {slug} = props ?? {};
+          const {slug,data} = props ?? {};
 
-          return  startClue(slug,requestOptions)
+          return  startClue(slug,data,requestOptions)
         }
 
 
@@ -1350,9 +1366,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type StartClueMutationResult = NonNullable<Awaited<ReturnType<typeof startClue>>>
-
+    export type StartClueMutationBody = BodyType<SolveModeInput> | undefined
     export type StartClueMutationError = ErrorType<void | ClueRetired>
-    export type StartClueMutationVariables = {slug: string}
+    export type StartClueMutationVariables = {slug: string;data?: BodyType<SolveModeInput>}
 
     /**
  * @summary Start or resume a clue challenge

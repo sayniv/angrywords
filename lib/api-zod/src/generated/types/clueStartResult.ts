@@ -12,4 +12,5 @@ export interface ClueStartResult {
   completed: boolean;
   elapsedSeconds: number;
   startedAt: Date;
+  assistEnabled: boolean;
 }

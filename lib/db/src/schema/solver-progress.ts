@@ -1,5 +1,6 @@
 import { createInsertSchema } from "drizzle-zod";
 import {
+  boolean,
   integer,
   pgTable,
   serial,
@@ -21,6 +22,7 @@ export const solverProgressTable = pgTable(
     displayName: text("display_name").notNull(),
     attemptsUsed: integer("attempts_used").notNull().default(0),
     hintsRevealed: integer("hints_revealed").notNull().default(0),
+    assistEnabled: boolean("assist_enabled").notNull().default(false),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     solvedAt: timestamp("solved_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),

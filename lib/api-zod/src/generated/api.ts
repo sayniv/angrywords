@@ -91,6 +91,7 @@ export const CreateClueResponse = zod.object({
   "userCompleted": zod.boolean().nullable(),
   "userElapsedSeconds": zod.number().int().nullable(),
   "userStartedAt": zod.coerce.date().nullable(),
+  "userAssistEnabled": zod.boolean().nullable(),
   "userSolved": zod.boolean().nullable(),
   "revealedAnswer": zod.string().nullable(),
   "userRevealedHints": zod.array(zod.string()),
@@ -144,6 +145,7 @@ export const GetClueResponse = zod.object({
   "userCompleted": zod.boolean().nullable(),
   "userElapsedSeconds": zod.number().int().nullable(),
   "userStartedAt": zod.coerce.date().nullable(),
+  "userAssistEnabled": zod.boolean().nullable(),
   "userSolved": zod.boolean().nullable(),
   "revealedAnswer": zod.string().nullable(),
   "userRevealedHints": zod.array(zod.string()),
@@ -294,14 +296,21 @@ export const GetClueLeaderboardParams = zod.object({
 })
 
 export const GetClueLeaderboardResponse = zod.object({
-  "noHints": zod.array(zod.object({
+  "noHintsNoAssist": zod.array(zod.object({
   "rank": zod.number().int(),
   "displayName": zod.string(),
   "elapsedSeconds": zod.number().int(),
   "attemptsUsed": zod.number().int(),
   "solvedAt": zod.coerce.date()
 })),
-  "hintsUsed": zod.array(zod.object({
+  "hintsUsedNoAssist": zod.array(zod.object({
+  "rank": zod.number().int(),
+  "displayName": zod.string(),
+  "elapsedSeconds": zod.number().int(),
+  "attemptsUsed": zod.number().int(),
+  "solvedAt": zod.coerce.date()
+})),
+  "assistUsed": zod.array(zod.object({
   "rank": zod.number().int(),
   "displayName": zod.string(),
   "elapsedSeconds": zod.number().int(),
@@ -332,7 +341,8 @@ export const SubmitAttemptResponse = zod.object({
   "attemptsRemaining": zod.number().int(),
   "completed": zod.boolean(),
   "elapsedSeconds": zod.number().int(),
-  "message": zod.string().optional()
+  "message": zod.string().optional(),
+  "feedback": zod.array(zod.enum(['green', 'yellow', 'neutral'])).optional()
 })
 
 
@@ -343,12 +353,19 @@ export const StartClueParams = zod.object({
   "slug": zod.coerce.string()
 })
 
+export const startClueBodyAssistEnabledDefault = false;
+
+export const StartClueBody = zod.object({
+  "assistEnabled": zod.boolean().default(startClueBodyAssistEnabledDefault)
+})
+
 export const StartClueResponse = zod.object({
   "attemptsUsed": zod.number().int(),
   "attemptsRemaining": zod.number().int(),
   "completed": zod.boolean(),
   "elapsedSeconds": zod.number().int(),
-  "startedAt": zod.coerce.date()
+  "startedAt": zod.coerce.date(),
+  "assistEnabled": zod.boolean()
 })
 
 
@@ -365,7 +382,8 @@ export const GiveUpClueResponse = zod.object({
   "attemptsRemaining": zod.number().int(),
   "completed": zod.boolean(),
   "elapsedSeconds": zod.number().int(),
-  "message": zod.string().optional()
+  "message": zod.string().optional(),
+  "feedback": zod.array(zod.enum(['green', 'yellow', 'neutral'])).optional()
 })
 
 

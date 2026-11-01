@@ -398,6 +398,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SolveModeInput"
       responses:
         "200":
           description: Current solver progress
@@ -602,7 +608,7 @@ components:
         - status
     Clue:
       type: object
-      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, userHasReported, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer, userRevealedHints, hintCount]
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, userHasReported, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userAssistEnabled, userSolved, revealedAnswer, userRevealedHints, hintCount]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -622,6 +628,7 @@ components:
         userCompleted: { type: ["boolean", "null"] }
         userElapsedSeconds: { type: ["integer", "null"] }
         userStartedAt: { type: ["string", "null"], format: date-time }
+        userAssistEnabled: { type: ["boolean", "null"] }
         userSolved: { type: ["boolean", "null"] }
         revealedAnswer: { type: ["string", "null"] }
         userRevealedHints:
@@ -701,15 +708,23 @@ components:
         completed: { type: boolean }
         elapsedSeconds: { type: integer }
         message: { type: string }
+        feedback:
+          type: array
+          items: { type: string, enum: [green, yellow, neutral] }
+    SolveModeInput:
+      type: object
+      properties:
+        assistEnabled: { type: boolean, default: false }
     ClueStartResult:
       type: object
-      required: [attemptsUsed, attemptsRemaining, completed, elapsedSeconds, startedAt]
+      required: [attemptsUsed, attemptsRemaining, completed, elapsedSeconds, startedAt, assistEnabled]
       properties:
         attemptsUsed: { type: integer }
         attemptsRemaining: { type: integer }
         completed: { type: boolean }
         elapsedSeconds: { type: integer }
         startedAt: { type: string, format: date-time }
+        assistEnabled: { type: boolean }
     LeaderboardEntry:
       type: object
       required: [rank, displayName, elapsedSeconds, attemptsUsed, solvedAt]
@@ -721,12 +736,15 @@ components:
         solvedAt: { type: string, format: date-time }
     ClueLeaderboard:
       type: object
-      required: [noHints, hintsUsed]
+      required: [noHintsNoAssist, hintsUsedNoAssist, assistUsed]
       properties:
-        noHints:
+        noHintsNoAssist:
           type: array
           items: { $ref: "#/components/schemas/LeaderboardEntry" }
-        hintsUsed:
+        hintsUsedNoAssist:
+          type: array
+          items: { $ref: "#/components/schemas/LeaderboardEntry" }
+        assistUsed:
           type: array
           items: { $ref: "#/components/schemas/LeaderboardEntry" }
     Dashboard:

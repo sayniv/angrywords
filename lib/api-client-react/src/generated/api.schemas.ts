@@ -49,6 +49,8 @@ export interface Clue {
   /** @nullable */
   userStartedAt: string | null;
   /** @nullable */
+  userAssistEnabled: boolean | null;
+  /** @nullable */
   userSolved: boolean | null;
   /** @nullable */
   revealedAnswer: string | null;
@@ -145,6 +147,15 @@ export interface AttemptInput {
   answer: string;
 }
 
+export type AttemptResultFeedbackItem = typeof AttemptResultFeedbackItem[keyof typeof AttemptResultFeedbackItem];
+
+
+export const AttemptResultFeedbackItem = {
+  green: 'green',
+  yellow: 'yellow',
+  neutral: 'neutral',
+} as const;
+
 export interface AttemptResult {
   correct: boolean;
   attemptsUsed: number;
@@ -152,6 +163,11 @@ export interface AttemptResult {
   completed: boolean;
   elapsedSeconds: number;
   message?: string;
+  feedback?: AttemptResultFeedbackItem[];
+}
+
+export interface SolveModeInput {
+  assistEnabled?: boolean;
 }
 
 export interface ClueStartResult {
@@ -160,6 +176,7 @@ export interface ClueStartResult {
   completed: boolean;
   elapsedSeconds: number;
   startedAt: string;
+  assistEnabled: boolean;
 }
 
 export interface LeaderboardEntry {
@@ -171,8 +188,9 @@ export interface LeaderboardEntry {
 }
 
 export interface ClueLeaderboard {
-  noHints: LeaderboardEntry[];
-  hintsUsed: LeaderboardEntry[];
+  noHintsNoAssist: LeaderboardEntry[];
+  hintsUsedNoAssist: LeaderboardEntry[];
+  assistUsed: LeaderboardEntry[];
 }
 
 export type SolverActivityState = typeof SolverActivityState[keyof typeof SolverActivityState];

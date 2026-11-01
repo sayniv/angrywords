@@ -35,6 +35,8 @@ export interface Clue {
   /** @nullable */
   userStartedAt: Date | null;
   /** @nullable */
+  userAssistEnabled: boolean | null;
+  /** @nullable */
   userSolved: boolean | null;
   /** @nullable */
   revealedAnswer: string | null;

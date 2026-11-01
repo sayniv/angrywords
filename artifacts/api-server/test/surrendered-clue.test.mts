@@ -24,6 +24,8 @@ import {
 } from "../src/lib/clue-hints.ts";
 import { CreateClueBody } from "@workspace/api-zod";
 import { confirmHintReveal } from "../../clue-sprint/src/lib/hint-confirmation.ts";
+import { getGuessFeedback } from "../src/lib/guess-feedback.ts";
+import { StartClueBody, StartClueResponse, SubmitAttemptResponse } from "@workspace/api-zod";
 
 const postgresDialect = new PgDialect();
 const solution = {
@@ -332,4 +334,50 @@ test("cancelling the hint confirmation calls no reveal action; confirming calls 
   );
   assert.equal(confirmed, "secret");
   assert.equal(reveals, 1);
+});
+
+test("assist feedback marks exact, misplaced, and absent letters without returning the answer", () => {
+  const target = "APPLE";
+  const feedback = getGuessFeedback("ALLEY", target);
+  assert.deepEqual(feedback, ["green", "yellow", "neutral", "yellow", "neutral"]);
+  assert.equal(JSON.stringify(feedback).includes(target), false);
+  assert.deepEqual(getGuessFeedback("APPLE", target), ["green", "green", "green", "green", "green"]);
+});
+
+test("repeated target letters are consumed once after green matches", () => {
+  assert.deepEqual(getGuessFeedback("BBB", "ABB"), ["neutral", "green", "green"]);
+  assert.deepEqual(getGuessFeedback("AAB", "ABA"), ["green", "yellow", "yellow"]);
+});
+
+test("assist-mode API schemas default legacy starts to off and keep feedback optional", () => {
+  assert.deepEqual(StartClueBody.parse({}), { assistEnabled: false });
+  assert.deepEqual(StartClueBody.parse({ assistEnabled: true }), { assistEnabled: true });
+  assert.equal(
+    StartClueResponse.parse({
+      attemptsUsed: 0,
+      attemptsRemaining: 5,
+      completed: false,
+      elapsedSeconds: 0,
+      startedAt: new Date("2026-11-01T12:00:00.000Z"),
+      assistEnabled: true,
+    }).assistEnabled,
+    true,
+  );
+  const noAssistResult = SubmitAttemptResponse.parse({
+    correct: false,
+    attemptsUsed: 1,
+    attemptsRemaining: 4,
+    completed: false,
+    elapsedSeconds: 5,
+  });
+  assert.equal("feedback" in noAssistResult, false);
+  const assistResult = SubmitAttemptResponse.parse({
+    correct: false,
+    attemptsUsed: 1,
+    attemptsRemaining: 4,
+    completed: false,
+    elapsedSeconds: 5,
+    feedback: ["green", "yellow", "neutral"],
+  });
+  assert.deepEqual(assistResult.feedback, ["green", "yellow", "neutral"]);
 });

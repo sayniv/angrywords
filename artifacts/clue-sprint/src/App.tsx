@@ -37,6 +37,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import { getSavedAttemptResult } from '@/lib/saved-attempt-result';
 import { confirmHintReveal } from '@/lib/hint-confirmation';
+import { GuessFeedback } from '@/components/guess-feedback';
 import NotFound from '@/pages/not-found';
 import TutorialPage from '@/pages/tutorial';
 import {
@@ -520,8 +521,8 @@ function PublicLeaderboard({ title, note, mode, data, loading, failed, retry }: 
 
 function ClueLeaderboardSection({ title, category, entries, loading, failed, retry }: {
   title: string;
-  category: 'no-hints' | 'hints-used';
-  entries?: ClueLeaderboard['noHints'];
+  category: 'gold' | 'hints-no-assist' | 'assist';
+  entries?: ClueLeaderboard['noHintsNoAssist'];
   loading: boolean;
   failed: boolean;
   retry: () => void;
@@ -545,7 +546,13 @@ function ClueLeaderboardSection({ title, category, entries, loading, failed, ret
     ) : (
       <div className="board-empty">
         <div className="empty-medal"><Trophy size={20} /></div>
-        <strong>{category === 'no-hints' ? 'No hint-free solves yet.' : 'No hint-assisted solves yet.'}</strong>
+        <strong>
+          {category === 'gold'
+            ? 'No gold-tier solves yet.'
+            : category === 'assist'
+              ? 'No assist-mode solves yet.'
+              : 'No hint-used solves yet.'}
+        </strong>
         <p>Be the first name on this board.</p>
       </div>
     )}
@@ -726,6 +733,8 @@ function ChallengePage() {
   const startClue = useStartClue();
   const cache = useQueryClient();
   const [answer, setAnswer] = useState('');
+  const [assistEnabled, setAssistEnabled] = useState(false);
+  const [lastGuess, setLastGuess] = useState('');
   const [result, setResult] = useState<import('@workspace/api-client-react').AttemptResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [retiredLocally, setRetiredLocally] = useState(false);
@@ -747,10 +756,11 @@ function ChallengePage() {
   const [hintError, setHintError] = useState('');
   const [revealedHints, setRevealedHints] = useState<string[]>([]);
   const [localElapsed, setLocalElapsed] = useState(0);
-  const startRequested = useRef(false);
   useEffect(() => {
     setResult(null);
     setAnswer('');
+    setAssistEnabled(false);
+    setLastGuess('');
     setCopied(false);
     setRatingChoice(0);
     setRatingError('');
@@ -759,23 +769,27 @@ function ChallengePage() {
     setGiveUpError('');
     setHintError('');
     setRevealedHints([]);
-    startRequested.current = false;
-  }, [slug]);
+    startClue.reset();
+  }, [slug, startClue.reset]);
   useEffect(() => {
     setRevealedHints(clue?.userRevealedHints ?? []);
   }, [slug, clue?.userRevealedHints]);
-  useEffect(() => {
-    if (!authLoaded || !isSignedIn || !clue || clue.isOwner || clue.userCompleted || startRequested.current) return;
-    startRequested.current = true;
-    void startClue.mutateAsync({ slug })
-      .then(() => cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }))
-      .catch((cause) => {
-        startRequested.current = false;
-        if (hasHttpStatus(cause, 410)) void cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
-      });
-  }, [authLoaded, isSignedIn, clue?.id, clue?.isOwner, clue?.userCompleted, slug, startClue.mutateAsync, cache]);
   const persistedStart = startClue.data?.startedAt || clue?.userStartedAt;
   const startedAt = persistedStart ? new Date(persistedStart).getTime() : null;
+  useEffect(() => {
+    if (clue?.userStartedAt && clue.userAssistEnabled !== null) {
+      setAssistEnabled(clue.userAssistEnabled);
+    }
+  }, [slug, clue?.userStartedAt, clue?.userAssistEnabled]);
+  const handleStart = async () => {
+    try {
+      const progress = await startClue.mutateAsync({ slug, data: { assistEnabled } });
+      setAssistEnabled(progress.assistEnabled);
+      await cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
+    } catch {
+      // The start panel displays the mutation error and allows a retry.
+    }
+  };
   useEffect(() => {
     if (result?.completed || clue?.userCompleted || !startedAt) {
       setLocalElapsed(clue?.userElapsedSeconds ?? 0);
@@ -788,6 +802,8 @@ function ChallengePage() {
   }, [startedAt, result?.completed, clue?.userCompleted, clue?.userElapsedSeconds, revealedHints.length]);
   const savedResult = getSavedAttemptResult(clue);
   const visibleResult = result ?? savedResult;
+  const visibleFeedback =
+    visibleResult && 'feedback' in visibleResult ? visibleResult.feedback : undefined;
   const copyChallengeLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -813,6 +829,9 @@ function ChallengePage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!answer.trim() || !clue) return;
+    const submittedGuess = answer.toLocaleUpperCase('en').replace(/[^A-Z0-9]/g, '');
+    setLastGuess('');
+    setResult(null);
     try {
       const next = await submitAttempt.mutateAsync({
         slug,
@@ -827,6 +846,7 @@ function ChallengePage() {
         });
       }
       setResult(next);
+      setLastGuess(submittedGuess);
       setAnswer('');
       await Promise.all([
         cache.invalidateQueries({ queryKey: getGetClueLeaderboardQueryKey(slug) }),
@@ -983,13 +1003,12 @@ function ChallengePage() {
             </>
           ) : !isSignedIn ? (
             <div className="guess-panel"><div className="guess-top"><div><span className="form-index">READY WHEN YOU ARE</span><h2>Join the race</h2></div><div className="timer-chip"><Clock3 size={14} /> {formatTime(0)}</div></div><p className="board-subtitle">Sign in to start your timer and save your attempts across devices.</p><Link href={`/sign-in?next=${encodeURIComponent(window.location.pathname)}`} className="button button-primary">Sign in to solve <ArrowRight size={16} /></Link></div>
-          ) : startClue.isError ? (
-            <div className="guess-panel"><div className="form-error" role="alert">Your timer could not start. Try again.</div><button className="button button-outline mt-4" onClick={() => { startRequested.current = false; startClue.mutate({ slug }); }}>Start the timer <RotateCcw size={15} /></button></div>
           ) : visibleResult?.completed ? (
             <div className="solved-panel">
               <div className="solved-burst"><Trophy size={25} /></div><span className="form-index">AHA MOMENT</span>
               <h2>{visibleResult.correct ? 'You cracked it.' : 'The answer is revealed.'}</h2>
               <p>{visibleResult.message || (visibleResult.correct ? `Solved in ${formatTime(visibleResult.elapsedSeconds)}.` : 'The clue got the better of this round. There is always the next one.')}</p>
+              <GuessFeedback guess={lastGuess} feedback={visibleFeedback} />
               <div className="solved-word">{clue.revealedAnswer || 'SPRINT COMPLETE'} <span>{visibleResult.attemptsUsed} {visibleResult.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
               {clue.wordplay && <div className="reveal-note"><Lightbulb size={16} /><div><strong>Setter's explanation</strong><p>{clue.wordplay}</p></div></div>}
               {visibleResult.correct && <div className="rating-panel" data-testid="panel-clue-rating">
@@ -1000,6 +1019,24 @@ function ChallengePage() {
                 </div>
                 {ratingError && <div className="form-error" role="alert" data-testid="status-rating-error">{ratingError}</div>}
               </div>}
+            </div>
+          ) : !persistedStart ? (
+            <div className="guess-panel solve-start-panel">
+              <div className="guess-top"><div><span className="form-index">READY WHEN YOU ARE</span><h2>Choose your sprint</h2></div><div className="timer-chip"><Clock3 size={14} /> {formatTime(0)}</div></div>
+              <p className="board-subtitle">Choose a play style before your timer starts. This choice is locked for this run.</p>
+              <label className="assist-choice" data-testid="choice-assist-mode">
+                <input
+                  type="checkbox"
+                  checked={assistEnabled}
+                  onChange={(event) => setAssistEnabled(event.target.checked)}
+                  disabled={startClue.isPending}
+                />
+                <span><strong>Assist mode</strong><small>Show green and yellow letter-position feedback after each guess.</small></span>
+              </label>
+              {startClue.isError && <div className="form-error" role="alert">Your run could not start. Try again.</div>}
+              <button className="button button-primary" type="button" data-testid="button-start-solve" onClick={() => void handleStart()} disabled={startClue.isPending}>
+                {startClue.isPending ? 'Starting…' : 'Start solving'} <ArrowRight size={16} />
+              </button>
             </div>
           ) : (
             <form className="guess-panel" onSubmit={handleSubmit}>
@@ -1016,6 +1053,7 @@ function ChallengePage() {
                 </button>
               </div>}
               {hintError && <div className="form-error" role="alert" data-testid="status-hint-error">{hintError}</div>}
+              <GuessFeedback guess={lastGuess} feedback={visibleFeedback} />
               {visibleResult && <div className={`attempt-result ${visibleResult.correct ? 'result-correct' : 'result-wrong'}`} role="status"><span>{visibleResult.correct ? <Check size={17} /> : <X size={17} />}</span><div><strong>{visibleResult.message || (visibleResult.correct ? 'That’s the one!' : 'Not quite. Keep turning it over.')}</strong>{visibleResult.correct && <p>You got it in {formatTime(visibleResult.elapsedSeconds)}. Your time is on the board.</p>}</div></div>}
               <div className="give-up-row">
                 <button className="button button-danger-outline" type="button" data-testid="button-give-up" onClick={() => void handleGiveUp()} disabled={giveUpClue.isPending || !persistedStart}>
@@ -1028,19 +1066,27 @@ function ChallengePage() {
         </section>
         <aside className="challenge-aside">
           <div className="board-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE RACE SO FAR</div><h2>Fastest solves</h2></div><Trophy size={22} /></div>
-          <p className="board-subtitle">Compare solves with and without hints.</p>
+          <p className="board-subtitle">Each run appears on one board based on its assist and hint settings.</p>
           <ClueLeaderboardSection
-            title="No hints"
-            category="no-hints"
-            entries={leaderboard?.noHints}
+            title="Gold · No hints, no assist"
+            category="gold"
+            entries={leaderboard?.noHintsNoAssist}
             loading={leaderboardLoading}
             failed={leaderboardError}
             retry={() => void refetchLeaderboard()}
           />
           <ClueLeaderboardSection
-            title="Hints used"
-            category="hints-used"
-            entries={leaderboard?.hintsUsed}
+            title="Hints · No assist"
+            category="hints-no-assist"
+            entries={leaderboard?.hintsUsedNoAssist}
+            loading={leaderboardLoading}
+            failed={leaderboardError}
+            retry={() => void refetchLeaderboard()}
+          />
+          <ClueLeaderboardSection
+            title="Assist · With or without hints"
+            category="assist"
+            entries={leaderboard?.assistUsed}
             loading={leaderboardLoading}
             failed={leaderboardError}
             retry={() => void refetchLeaderboard()}

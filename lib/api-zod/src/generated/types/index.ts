@@ -9,6 +9,7 @@
 export * from './accountDeletionInput';
 export * from './attemptInput';
 export * from './attemptResult';
+export * from './attemptResultFeedbackItem';
 export * from './clue';
 export * from './clueAppealDecision';
 export * from './clueAppealDecisionAction';
@@ -40,6 +41,7 @@ export * from './listCluesSort';
 export * from './profileInput';
 export * from './publicProfile';
 export * from './setterLeaderboardEntry';
+export * from './solveModeInput';
 export * from './solverActivity';
 export * from './solverActivityPage';
 export * from './solverActivityState';
