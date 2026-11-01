@@ -170,6 +170,8 @@ export interface Dashboard {
 
 export interface PublicProfile {
   publicId: string;
+  /** Public IDs previously claimed by the signed-in account, including its current ID. */
+  claimedPublicIds: string[];
   isGuest: boolean;
   needsSetup: boolean;
   /** @nullable */
@@ -178,9 +180,8 @@ export interface PublicProfile {
 
 export interface ProfileInput {
   /**
-     * @minLength 3
-     * @maxLength 24
-     * @pattern ^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$
+     * A new ID must use 3–24 letters, numbers, underscores, or hyphens; an ID already claimed by this account may be restored.
+     * @maxLength 48
      */
   publicId?: string;
   /** @maxLength 280 */

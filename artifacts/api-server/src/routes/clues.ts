@@ -44,6 +44,8 @@ import {
   cluesTable,
   solverProgressTable,
   userProfilesTable,
+  userPublicIdReservationsTable,
+  type UserProfile,
 } from "@workspace/db";
 import { containsObjectionableLanguage } from "../lib/content-moderation";
 import {
@@ -85,19 +87,31 @@ function requireReviewer(req: Parameters<RequestHandler>[0], res: Parameters<Req
   return userId;
 }
 
-function publicProfileResponse(profile: {
+async function publicProfileResponse(profile: {
+  userId: string;
   publicId: string;
   isGuest: boolean;
   onboardingComplete: boolean;
   blurb: string | null;
 }) {
+  const reservations = await db
+    .select({ publicId: userPublicIdReservationsTable.publicId })
+    .from(userPublicIdReservationsTable)
+    .where(eq(userPublicIdReservationsTable.userId, profile.userId));
+  const claimedPublicIds = new Set([
+    profile.publicId,
+    ...reservations.map((reservation) => reservation.publicId),
+  ]);
   return {
     publicId: profile.publicId,
+    claimedPublicIds: [...claimedPublicIds],
     isGuest: profile.isGuest,
     needsSetup: !profile.onboardingComplete,
     blurb: profile.blurb,
   };
 }
+
+class PublicIdAlreadyClaimedError extends Error {}
 
 async function ensureProfile(userId: string) {
   const [existing] = await db
@@ -112,27 +126,54 @@ async function ensureProfile(userId: string) {
     // collision guard, and a collision simply retries with a fresh number.
     const guestNumber = BigInt(Date.now()) * 1_000n + BigInt(randomInt(0, 1_000));
     const publicId = `Guest ${guestNumber}`;
-    const [created] = await db
-      .insert(userProfilesTable)
-      .values({
-        userId,
-        publicId,
-        normalizedPublicId: publicId.toLowerCase(),
-        isGuest: true,
-      })
-      .onConflictDoNothing()
-      .returning();
-    if (created) {
-      await db.transaction(async (tx) => {
+    let created: UserProfile | undefined;
+    try {
+      created = await db.transaction(async (tx) => {
+        const [profile] = await tx
+          .insert(userProfilesTable)
+          .values({
+            userId,
+            publicId,
+            normalizedPublicId: publicId.toLowerCase(),
+            isGuest: true,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (!profile) return undefined;
+
+        const [reservation] = await tx
+          .insert(userPublicIdReservationsTable)
+          .values({
+            userId,
+            normalizedPublicId: profile.normalizedPublicId,
+            publicId: profile.publicId,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (!reservation) {
+          const [owner] = await tx
+            .select({ userId: userPublicIdReservationsTable.userId })
+            .from(userPublicIdReservationsTable)
+            .where(eq(userPublicIdReservationsTable.normalizedPublicId, profile.normalizedPublicId))
+            .limit(1);
+          if (owner?.userId !== userId) throw new PublicIdAlreadyClaimedError();
+        }
+
         await tx
           .update(cluesTable)
-          .set({ setterName: created.publicId })
+          .set({ setterName: profile.publicId })
           .where(eq(cluesTable.setterUserId, userId));
         await tx
           .update(solverProgressTable)
-          .set({ displayName: created.publicId })
+          .set({ displayName: profile.publicId })
           .where(eq(solverProgressTable.userId, userId));
+        return profile;
       });
+    } catch (error) {
+      if (!(error instanceof PublicIdAlreadyClaimedError)) throw error;
+      continue;
+    }
+    if (created) {
       return created;
     }
 
@@ -1252,7 +1293,7 @@ router.get("/leaderboards/setters", async (_req, res): Promise<void> => {
 
 router.get("/me/profile", requireAuth, async (req, res): Promise<void> => {
   const profile = await ensureProfile(getAuth(req).userId!);
-  res.json(GetMyProfileResponse.parse(publicProfileResponse(profile)));
+  res.json(GetMyProfileResponse.parse(await publicProfileResponse(profile)));
 });
 
 router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {
@@ -1265,7 +1306,22 @@ router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {
   const userId = getAuth(req).userId!;
   const existing = await ensureProfile(userId);
   const requestedId = parsed.data.publicId?.trim();
-  if (requestedId && !/^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/.test(requestedId)) {
+  const normalizedRequestedId = requestedId?.toLowerCase();
+  const [priorReservation] = normalizedRequestedId
+    ? await db
+        .select({ userId: userPublicIdReservationsTable.userId })
+        .from(userPublicIdReservationsTable)
+        .where(eq(userPublicIdReservationsTable.normalizedPublicId, normalizedRequestedId))
+        .limit(1)
+    : [];
+  const isOwnReservedId =
+    normalizedRequestedId === existing.normalizedPublicId ||
+    priorReservation?.userId === userId;
+  if (
+    requestedId &&
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/.test(requestedId) &&
+    !isOwnReservedId
+  ) {
     res.status(400).json({
       error: "Use 3–24 letters, numbers, underscores, or hyphens for your public ID.",
     });
@@ -1285,11 +1341,41 @@ router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {
     requestedBlurb === undefined ? existing.blurb : requestedBlurb.trim() || null;
   try {
     const updated = await db.transaction(async (tx) => {
+      const currentProfiles = await tx
+        .select({
+          userId: userProfilesTable.userId,
+          normalizedPublicId: userProfilesTable.normalizedPublicId,
+          publicId: userProfilesTable.publicId,
+        })
+        .from(userProfilesTable)
+        .orderBy(asc(userProfilesTable.normalizedPublicId));
+      if (currentProfiles.length) {
+        await tx
+          .insert(userPublicIdReservationsTable)
+          .values(currentProfiles)
+          .onConflictDoNothing();
+      }
+
+      const normalizedPublicId = publicId.toLowerCase();
+      const [reservation] = await tx
+        .insert(userPublicIdReservationsTable)
+        .values({ userId, normalizedPublicId, publicId })
+        .onConflictDoNothing()
+        .returning();
+      if (!reservation) {
+        const [owner] = await tx
+          .select({ userId: userPublicIdReservationsTable.userId })
+          .from(userPublicIdReservationsTable)
+          .where(eq(userPublicIdReservationsTable.normalizedPublicId, normalizedPublicId))
+          .limit(1);
+        if (owner?.userId !== userId) throw new PublicIdAlreadyClaimedError();
+      }
+
       const [profile] = await tx
         .update(userProfilesTable)
         .set({
           publicId,
-          normalizedPublicId: publicId.toLowerCase(),
+          normalizedPublicId,
           blurb,
           isGuest,
           onboardingComplete: true,
@@ -1309,9 +1395,9 @@ router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {
         .where(eq(solverProgressTable.userId, userId));
       return profile;
     });
-    res.json(UpdateMyProfileResponse.parse(publicProfileResponse(updated)));
+    res.json(UpdateMyProfileResponse.parse(await publicProfileResponse(updated)));
   } catch (error) {
-    if (isUniqueViolation(error)) {
+    if (error instanceof PublicIdAlreadyClaimedError || isUniqueViolation(error)) {
       res.status(409).json({ error: "That public ID is already in use. Try another one." });
       return;
     }

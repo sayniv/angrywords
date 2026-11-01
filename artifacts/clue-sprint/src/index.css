@@ -246,6 +246,9 @@
 .profile-blurb-form { display: grid; grid-template-columns: .85fr 1.15fr; gap: 35px; margin: 4px 0 43px; padding: 24px 27px; background: #f2eee4; border: 1px solid var(--line); }
 .profile-blurb-form h2 { margin: 7px 0 4px; font: 600 24px/1.1 var(--app-font-serif); letter-spacing: -.04em; }
 .profile-blurb-form p { margin: 0; color: #7b7064; font-size: 11px; line-height: 1.65; }
+.public-id-field input { width: 100%; min-height: 43px; padding: 0 13px; color: var(--ink); background: #fffdf8; border: 1px solid #d9cebf; border-radius: 5px; font: 13px var(--app-font-sans); }
+.public-id-field > .field-hint { justify-content: flex-start; margin: 7px 0 0; line-height: 1.5; }
+.public-id-field .button { margin-top: 12px; }
 .blurb-field textarea { width: 100%; min-height: 78px; padding: 11px 13px; color: var(--ink); background: #fffdf8; border: 1px solid #d9cebf; border-radius: 5px; resize: vertical; font: 13px/1.55 var(--app-font-sans); }
 .blurb-field .button { margin-top: 12px; }
 .save-confirmation { display: flex; align-items: center; gap: 6px; margin: 8px 0 0 !important; color: var(--sage) !important; font-weight: 650; }

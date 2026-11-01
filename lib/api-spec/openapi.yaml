@@ -462,7 +462,7 @@ paths:
     patch:
       operationId: updateMyProfile
       tags: [profile]
-      summary: Choose a public ID or continue with the generated guest ID
+      summary: Update public profile settings
       security:
         - clerkSession: []
       requestBody:
@@ -621,9 +621,13 @@ components:
         startedAt: { type: string, format: date-time }
     PublicProfile:
       type: object
-      required: [publicId, isGuest, needsSetup, blurb]
+      required: [publicId, claimedPublicIds, isGuest, needsSetup, blurb]
       properties:
         publicId: { type: string }
+        claimedPublicIds:
+          type: array
+          description: Public IDs previously claimed by the signed-in account, including its current ID.
+          items: { type: string }
         isGuest: { type: boolean }
         needsSetup: { type: boolean }
         blurb: { type: ["string", "null"] }
@@ -632,9 +636,8 @@ components:
       properties:
         publicId:
           type: string
-          minLength: 3
-          maxLength: 24
-          pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$"
+          maxLength: 48
+          description: A new ID must use 3–24 letters, numbers, underscores, or hyphens; an ID already claimed by this account may be restored.
         blurb:
           type: string
           maxLength: 280

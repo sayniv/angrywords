@@ -23,3 +23,4 @@ export * from "./clue-appeals";
 export * from "./clue-ratings";
 export * from "./solver-progress";
 export * from "./user-profiles";
+export * from "./user-public-id-reservations";

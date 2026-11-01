@@ -944,7 +944,39 @@ function DashboardPage() {
   const [blurb, setBlurb] = useState('');
   const [blurbError, setBlurbError] = useState('');
   const [blurbSaved, setBlurbSaved] = useState(false);
+  const [publicId, setPublicId] = useState('');
+  const [publicIdError, setPublicIdError] = useState('');
+  const [publicIdSaved, setPublicIdSaved] = useState(false);
   useEffect(() => { setBlurb(profile?.blurb ?? ''); }, [profile?.publicId, profile?.blurb]);
+  useEffect(() => {
+    if (profile) {
+      setPublicId(profile.publicId);
+      setPublicIdError('');
+      setPublicIdSaved(false);
+    }
+  }, [profile?.publicId]);
+  const savePublicId = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPublicIdError('');
+    setPublicIdSaved(false);
+    const requestedId = publicId.trim();
+    const canRestore = profile?.claimedPublicIds.some(
+      (claimedId) => claimedId.toLowerCase() === requestedId.toLowerCase(),
+    ) ?? false;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$/.test(requestedId) && !canRestore) {
+      setPublicIdError('Use 3–24 letters, numbers, underscores, or hyphens.');
+      return;
+    }
+    try {
+      const updated = await updateProfile.mutateAsync({ data: { publicId: requestedId } });
+      cache.setQueryData(getGetMyProfileQueryKey(), updated);
+      setPublicId(updated.publicId);
+      await cache.invalidateQueries();
+      setPublicIdSaved(true);
+    } catch (cause) {
+      setPublicIdError(apiErrorMessage(cause, 'Your public ID could not be saved. Please try again.'));
+    }
+  };
   const saveBlurb = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBlurbError('');
@@ -968,6 +1000,32 @@ function DashboardPage() {
       <Link href="/create" className="button button-primary"><PenLine size={16} /> Set a new clue</Link>
     </div>
     {isLoading ? <DashboardSkeleton /> : isError || !dashboard ? <div className="state-panel"><h2>Your page is taking a moment.</h2><p>We couldn't fetch your puzzle notes just now.</p><button className="button button-outline" onClick={() => refetch()}>Refresh page <RotateCcw size={15} /></button></div> : <>
+      <form className="profile-blurb-form" onSubmit={(event) => void savePublicId(event)} data-testid="form-public-id">
+        <div><span className="form-index">YOUR PUBLIC ID</span><h2>Choose how people see you.</h2><p>Your ID appears on your clues and in the leaderboards. Previously used IDs stay yours and can be restored.</p></div>
+        <div className="public-id-field">
+          <label className="field-label" htmlFor="profile-public-id">Public ID</label>
+          <input
+            id="profile-public-id"
+            data-testid="input-public-id"
+            value={publicId}
+            onChange={(event) => { setPublicId(event.target.value); setPublicIdError(''); setPublicIdSaved(false); }}
+            list="claimed-public-ids"
+            minLength={3}
+            maxLength={24}
+            autoComplete="nickname"
+            required
+          />
+          <datalist id="claimed-public-ids">
+            {profile?.claimedPublicIds.map((claimedId) => <option key={claimedId} value={claimedId} />)}
+          </datalist>
+          <p className="field-hint">3–24 letters, numbers, underscores, or hyphens. Matching ignores capitalization.</p>
+          {publicIdError && <div className="form-error" role="alert" data-testid="status-public-id-error"><X size={16} />{publicIdError}</div>}
+          {publicIdSaved && <p className="save-confirmation" role="status" data-testid="status-public-id-saved"><Check size={15} /> Your public ID has been updated.</p>}
+          <button className="button button-outline" type="submit" data-testid="button-save-public-id" disabled={updateProfile.isPending}>
+            {updateProfile.isPending ? 'Saving…' : 'Save public ID'} <ArrowRight size={15} />
+          </button>
+        </div>
+      </form>
       <form className="profile-blurb-form" onSubmit={(event) => void saveBlurb(event)} data-testid="form-public-blurb">
         <div><span className="form-index">YOUR PUBLIC PROFILE</span><h2>A few words about your setter style.</h2><p>This short note appears beside your clues for everyone to see.</p></div>
         <div className="blurb-field"><label className="field-label" htmlFor="profile-blurb">Public blurb <span className="optional-label">UP TO 280 CHARACTERS</span></label><textarea id="profile-blurb" data-testid="input-public-blurb" value={blurb} onChange={(event) => { setBlurb(event.target.value); setBlurbSaved(false); }} maxLength={280} rows={3} placeholder="A little about the kind of clues you like to write…" /><div className="field-hint"><span>Keep it friendly and puzzle-focused.</span><span>{blurb.length}/280</span></div>

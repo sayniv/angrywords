@@ -1522,7 +1522,7 @@ export const getUpdateMyProfileUrl = () => {
 }
 
 /**
- * @summary Choose a public ID or continue with the generated guest ID
+ * @summary Update public profile settings
  */
 export const updateMyProfile = async (profileInput: ProfileInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicProfile> => {
 
@@ -1588,7 +1588,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateMyProfileMutationVariables = {data: BodyType<ProfileInput>}
 
     /**
- * @summary Choose a public ID or continue with the generated guest ID
+ * @summary Update public profile settings
  */
 export const useUpdateMyProfile = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyProfile>>, TError,UpdateMyProfileMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}

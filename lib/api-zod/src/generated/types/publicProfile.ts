@@ -8,6 +8,8 @@
 
 export interface PublicProfile {
   publicId: string;
+  /** Public IDs previously claimed by the signed-in account, including its current ID. */
+  claimedPublicIds: string[];
   isGuest: boolean;
   needsSetup: boolean;
   /** @nullable */

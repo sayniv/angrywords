@@ -372,6 +372,7 @@ export const GetMyDashboardResponse = zod.object({
  */
 export const GetMyProfileResponse = zod.object({
   "publicId": zod.string(),
+  "claimedPublicIds": zod.array(zod.string()).describe('Public IDs previously claimed by the signed-in account, including its current ID.'),
   "isGuest": zod.boolean(),
   "needsSetup": zod.boolean(),
   "blurb": zod.string().nullable()
@@ -379,24 +380,22 @@ export const GetMyProfileResponse = zod.object({
 
 
 /**
- * @summary Choose a public ID or continue with the generated guest ID
+ * @summary Update public profile settings
  */
-export const updateMyProfileBodyPublicIdMin = 3;
-export const updateMyProfileBodyPublicIdMax = 24;
+export const updateMyProfileBodyPublicIdMax = 48;
 
-
-export const updateMyProfileBodyPublicIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9_-]{2,23}$');
 export const updateMyProfileBodyBlurbMax = 280;
 
 
 
 export const UpdateMyProfileBody = zod.object({
-  "publicId": zod.string().min(updateMyProfileBodyPublicIdMin).max(updateMyProfileBodyPublicIdMax).regex(updateMyProfileBodyPublicIdRegExp).optional(),
+  "publicId": zod.string().max(updateMyProfileBodyPublicIdMax).optional().describe('A new ID must use 3–24 letters, numbers, underscores, or hyphens; an ID already claimed by this account may be restored.'),
   "blurb": zod.string().max(updateMyProfileBodyBlurbMax).optional()
 })
 
 export const UpdateMyProfileResponse = zod.object({
   "publicId": zod.string(),
+  "claimedPublicIds": zod.array(zod.string()).describe('Public IDs previously claimed by the signed-in account, including its current ID.'),
   "isGuest": zod.boolean(),
   "needsSetup": zod.boolean(),
   "blurb": zod.string().nullable()

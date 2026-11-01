@@ -27,10 +27,11 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 ## Architecture decisions
 
 _Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Public IDs are case-insensitive and permanently reserved to the account that first claims them; public display names are read from the current profile.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Clue Sprint lets signed-in users publish cryptic clues, solve friends' clues, and appear on leaderboards with a public ID they can change without releasing IDs they previously claimed.
 
 ## User preferences
 
