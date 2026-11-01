@@ -482,6 +482,31 @@ paths:
           description: Invalid public ID
         "409":
           description: Public ID is already in use
+  /me/account:
+    delete:
+      operationId: deleteMyAccount
+      tags: [profile]
+      summary: Delete the signed-in account and retain public history
+      description: Deletes the Clerk sign-in and public blurb while retaining the reserved public ID, published clues, solves, and ratings under that ID.
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDeletionInput"
+      responses:
+        "204":
+          description: Account deleted and public history retained under the reserved ID
+        "400":
+          description: Confirmation did not match the current public ID
+        "401":
+          description: Sign in to delete your account
+        "500":
+          description: Sign-in removed but public-profile cleanup could not be completed
+        "502":
+          description: Account deletion could not be completed
 components:
   securitySchemes:
     clerkSession:
@@ -641,6 +666,15 @@ components:
         blurb:
           type: string
           maxLength: 280
+    AccountDeletionInput:
+      type: object
+      required: [confirmationPublicId]
+      properties:
+        confirmationPublicId:
+          type: string
+          minLength: 3
+          maxLength: 48
+          description: The signed-in user's current public ID, entered to confirm permanent deletion.
     ClueRatingInput:
       type: object
       required: [rating]

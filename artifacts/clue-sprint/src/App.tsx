@@ -17,7 +17,7 @@ import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
   getGetMyProfileQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
   getListPendingClueAppealsQueryKey,
-  getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
+  getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard,
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
@@ -1053,7 +1053,93 @@ function DashboardPage() {
       <div className="dash-note"><span><Sparkles size={17} /></span><p>Every new clue starts its own race. Share the link and let the solving begin.</p><Link href="/create">Make another <ArrowUpRight size={15} /></Link></div>
       <div className="reviewer-link-wrap"><Link href="/review" className="text-link" data-testid="link-review-appeals">Open the reviewer queue <ArrowRight size={15} /></Link></div>
     </>}
+    {profile && <AccountDeletionPanel publicId={profile.publicId} />}
   </main><Footer /></>;
+}
+
+function AccountDeletionPanel({ publicId }: { publicId: string }) {
+  const { signOut } = useClerk();
+  const cache = useQueryClient();
+  const deleteMyAccount = useDeleteMyAccount();
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState('');
+  const matchesPublicId = confirmation.trim().toLowerCase() === publicId.toLowerCase();
+
+  const cancel = () => {
+    setIsConfirming(false);
+    setConfirmation('');
+    setError('');
+  };
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!matchesPublicId) return;
+    setError('');
+    try {
+      await deleteMyAccount.mutateAsync({ data: { confirmationPublicId: confirmation.trim() } });
+      cache.clear();
+      try {
+        await signOut({ redirectUrl: basePath || '/' });
+      } catch {
+        window.location.replace(basePath || '/');
+      }
+    } catch (cause) {
+      setError(apiErrorMessage(cause, 'Your account could not be deleted. Your public ID and history are unchanged.'));
+    }
+  };
+
+  return <section className="account-delete-zone" aria-labelledby="account-delete-title" data-testid="panel-delete-account">
+    <div className="account-delete-header">
+      <div>
+        <span className="form-index">ACCOUNT CONTROL</span>
+        <h2 id="account-delete-title">Delete your account</h2>
+        <p>
+          Your sign-in and private sign-in details will be permanently deleted, and your public blurb will be cleared.
+          Published clues, ratings, solves, and leaderboard history will remain under <strong>{publicId}</strong>.
+          This public ID will stay reserved and cannot be reused. This action cannot be undone.
+        </p>
+      </div>
+      {!isConfirming && <button
+        className="button button-danger-outline"
+        type="button"
+        data-testid="button-open-delete-account"
+        onClick={() => { setIsConfirming(true); setError(''); }}
+      >
+        <Trash2 size={15} /> Delete account
+      </button>}
+    </div>
+    {isConfirming && <form className="account-delete-confirmation" onSubmit={(event) => void submit(event)}>
+      <label className="field-label" htmlFor="account-delete-public-id">
+        Type <strong>{publicId}</strong> to confirm
+      </label>
+      <input
+        id="account-delete-public-id"
+        className="account-delete-input"
+        type="text"
+        autoComplete="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        value={confirmation}
+        onChange={(event) => { setConfirmation(event.target.value); setError(''); }}
+        aria-describedby="account-delete-hint"
+        data-testid="input-delete-account-confirmation"
+      />
+      <p id="account-delete-hint" className="field-hint">Matching ignores capitalization. Your clues and scores will remain visible under this ID.</p>
+      {error && <div className="form-error" role="alert" data-testid="status-delete-account-error"><X size={16} />{error}</div>}
+      <div className="account-delete-actions">
+        <button className="button button-outline" type="button" onClick={cancel} disabled={deleteMyAccount.isPending}>Cancel</button>
+        <button
+          className="button button-danger-outline"
+          type="submit"
+          data-testid="button-confirm-delete-account"
+          disabled={!matchesPublicId || deleteMyAccount.isPending}
+        >
+          <Trash2 size={15} /> {deleteMyAccount.isPending ? 'Deleting account…' : 'Permanently delete account'}
+        </button>
+      </div>
+    </form>}
+  </section>;
 }
 
 function apiErrorMessage(cause: unknown, fallback: string) {

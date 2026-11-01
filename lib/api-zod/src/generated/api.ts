@@ -402,3 +402,19 @@ export const UpdateMyProfileResponse = zod.object({
 })
 
 
+/**
+ * Deletes the Clerk sign-in and public blurb while retaining the reserved public ID, published clues, solves, and ratings under that ID.
+ * @summary Delete the signed-in account and retain public history
+ */
+export const deleteMyAccountBodyConfirmationPublicIdMin = 3;
+export const deleteMyAccountBodyConfirmationPublicIdMax = 48;
+
+
+
+export const DeleteMyAccountBody = zod.object({
+  "confirmationPublicId": zod.string().min(deleteMyAccountBodyConfirmationPublicIdMin).max(deleteMyAccountBodyConfirmationPublicIdMax).describe('The signed-in user\'s current public ID, entered to confirm permanent deletion.')
+})
+
+export const DeleteMyAccountResponse = zod.void()
+
+

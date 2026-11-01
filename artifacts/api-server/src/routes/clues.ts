@@ -1,6 +1,6 @@
 import { randomBytes, randomInt } from "node:crypto";
 import { Router, type IRouter, type RequestHandler } from "express";
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { and, asc, avg, count, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import {
   AttemptResult,
@@ -15,6 +15,7 @@ import {
   GetMyDashboardResponse,
   GetMyProfileResponse,
   ListCluesResponse,
+  DeleteMyAccountBody,
   RetireClueParams,
   StartClueParams,
   StartClueResponse,
@@ -112,6 +113,7 @@ async function publicProfileResponse(profile: {
 }
 
 class PublicIdAlreadyClaimedError extends Error {}
+class AccountDeletionConfirmationError extends Error {}
 
 async function ensureProfile(userId: string) {
   const [existing] = await db
@@ -1294,6 +1296,76 @@ router.get("/leaderboards/setters", async (_req, res): Promise<void> => {
 router.get("/me/profile", requireAuth, async (req, res): Promise<void> => {
   const profile = await ensureProfile(getAuth(req).userId!);
   res.json(GetMyProfileResponse.parse(await publicProfileResponse(profile)));
+});
+
+router.delete("/me/account", requireAuth, async (req, res): Promise<void> => {
+  const parsed = DeleteMyAccountBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  const profile = await ensureProfile(userId);
+  const normalizedConfirmation = parsed.data.confirmationPublicId.trim().toLowerCase();
+  if (normalizedConfirmation !== profile.normalizedPublicId) {
+    res.status(400).json({ error: "Enter your current public ID exactly to confirm deletion." });
+    return;
+  }
+
+  let clerkAccountDeleted = false;
+  try {
+    await db.transaction(async (tx) => {
+      // Retain the profile and ID reservation as the public owner of preserved history.
+      const [updated] = await tx
+        .update(userProfilesTable)
+        .set({ blurb: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(userProfilesTable.userId, userId),
+            eq(userProfilesTable.normalizedPublicId, normalizedConfirmation),
+          ),
+        )
+        .returning({ id: userProfilesTable.id });
+      if (!updated) throw new AccountDeletionConfirmationError();
+
+      await clerkClient.users.deleteUser(userId);
+      clerkAccountDeleted = true;
+    });
+  } catch (error) {
+    if (error instanceof AccountDeletionConfirmationError) {
+      res.status(400).json({ error: "Your public ID changed. Refresh and try again." });
+      return;
+    }
+
+    if (!clerkAccountDeleted) {
+      req.log.error({ err: error }, "Account deletion failed before the sign-in was removed.");
+      res.status(502).json({
+        error: "We couldn't delete your sign-in. Your profile, ID reservation, and public history are unchanged. Please try again.",
+      });
+      return;
+    }
+
+    try {
+      await db
+        .update(userProfilesTable)
+        .set({ blurb: null, updatedAt: new Date() })
+        .where(eq(userProfilesTable.userId, userId));
+    } catch (cleanupError) {
+      req.log.error(
+        { err: error, cleanupError },
+        "The sign-in was deleted, but the public profile blurb could not be cleared.",
+      );
+      res.status(500).json({
+        error: "Your sign-in was deleted, but your public blurb could not be cleared. Please contact support.",
+      });
+      return;
+    }
+
+    req.log.warn({ err: error }, "Account deletion cleanup succeeded after a database transaction error.");
+  }
+
+  res.sendStatus(204);
 });
 
 router.patch("/me/profile", requireAuth, async (req, res): Promise<void> => {

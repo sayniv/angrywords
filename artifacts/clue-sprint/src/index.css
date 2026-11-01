@@ -246,6 +246,17 @@
 .profile-blurb-form { display: grid; grid-template-columns: .85fr 1.15fr; gap: 35px; margin: 4px 0 43px; padding: 24px 27px; background: #f2eee4; border: 1px solid var(--line); }
 .profile-blurb-form h2 { margin: 7px 0 4px; font: 600 24px/1.1 var(--app-font-serif); letter-spacing: -.04em; }
 .profile-blurb-form p { margin: 0; color: #7b7064; font-size: 11px; line-height: 1.65; }
+.account-delete-zone { margin-top: 35px; padding: 24px 27px; border: 1px solid #e5b9aa; background: #fff8f4; }
+.account-delete-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.account-delete-header > div { max-width: 760px; }
+.account-delete-zone h2 { margin: 7px 0 7px; color: #8f352b; font: 600 24px/1.1 var(--app-font-serif); letter-spacing: -.04em; }
+.account-delete-zone p { margin: 0; color: #75685e; font-size: 11px; line-height: 1.7; }
+.account-delete-zone p strong { color: var(--ink); }
+.account-delete-confirmation { display: grid; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid #e5c7bd; }
+.account-delete-confirmation input { width: min(100%, 440px); min-height: 42px; padding: 10px 12px; color: var(--ink); background: #fffdf8; border: 1px solid #dfc7bd; border-radius: 4px; font: 12px var(--app-font-sans); }
+.account-delete-confirmation input:focus { outline: 2px solid #c94e3d; outline-offset: 2px; }
+.account-delete-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 5px; }
+.account-delete-actions button:disabled { opacity: .55; cursor: not-allowed; }
 .public-id-field input { width: 100%; min-height: 43px; padding: 0 13px; color: var(--ink); background: #fffdf8; border: 1px solid #d9cebf; border-radius: 5px; font: 13px var(--app-font-sans); }
 .public-id-field > .field-hint { justify-content: flex-start; margin: 7px 0 0; line-height: 1.5; }
 .public-id-field .button { margin-top: 12px; }
@@ -810,6 +821,10 @@
 }
 @media (max-width: 860px) {
   .profile-blurb-form { grid-template-columns: 1fr; gap: 17px; }
+  .account-delete-zone { padding: 19px 17px; }
+  .account-delete-header { flex-direction: column; gap: 15px; }
+  .account-delete-actions { justify-content: stretch; }
+  .account-delete-actions button { flex: 1; }
 }
 @media (max-width: 600px) {
   .clue-tools { width: 100%; align-items: flex-start; flex-direction: column; gap: 12px; }
@@ -825,6 +840,7 @@
   .challenge-date { margin-left: auto; }
   .challenge-actions { width: 100%; justify-content: flex-end; }
   .profile-blurb-form { padding: 19px 17px; }
+  .account-delete-actions { flex-direction: column-reverse; }
 }
 
 /* Optional cryptic-clue field guide */

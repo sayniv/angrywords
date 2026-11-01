@@ -7,8 +7,10 @@ Setters review the clue, answer, wordplay, and attempt limit before publishing. 
 
 Retiring a clue or blocking it after 100 distinct signed-in accounts report it hides it from public browsing and solving while preserving attempts, ratings, and leaderboard history. A person can report a clue once per account; setters cannot report their own clue.
 
+Deleting an account removes its Clerk sign-in and public blurb but retains the reserved public ID, published clues, solves, and ratings under that ID. Do not remove the profile or ID reservation that anchors this history.
+
 The user does not require multilingual moderation.
 
-**Why:** The user requires clue setters to confirm the exact content before publication, forbids edits afterward, and set the 100-report blocking threshold. Hidden or retired clues must not erase community history.
+**Why:** The user requires immutable published clues, history-preserving retirement, and account deletion that keeps clues and scores under a permanently reserved public ID.
 
-**How to apply:** Preserve immutable publication, unique-account reporting, and history-preserving retirement/blocking in future clue lifecycle changes, API updates, and UI copy.
+**How to apply:** Preserve immutable publication, unique-account reporting, and history-preserving retirement/blocking. When deleting an account, remove its Clerk sign-in and blurb but retain the profile, ID reservation, and public history.

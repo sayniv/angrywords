@@ -188,6 +188,15 @@ export interface ProfileInput {
   blurb?: string;
 }
 
+export interface AccountDeletionInput {
+  /**
+     * The signed-in user's current public ID, entered to confirm permanent deletion.
+     * @minLength 3
+     * @maxLength 48
+     */
+  confirmationPublicId: string;
+}
+
 export interface ClueRatingInput {
   /**
      * @minimum 1
