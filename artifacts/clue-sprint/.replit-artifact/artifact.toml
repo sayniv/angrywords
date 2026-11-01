@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Clue Sprint"
+description = "A social cryptic crossword challenge app where setters publish clues, solvers race the clock with limited attempts, and every puzzle has its own leaderboard."
+version = "1.0.0"
+id = "artifacts/clue-sprint"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19635
+
+[services.development]
+run = "pnpm --filter @workspace/clue-sprint run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/clue-sprint", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/clue-sprint/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19635"
+BASE_PATH = "/"

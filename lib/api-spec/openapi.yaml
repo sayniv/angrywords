@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: clues
+    description: Cryptic clue challenges
+  - name: profile
+    description: Signed-in solver profile
 paths:
   /healthz:
     get:
@@ -24,7 +28,153 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /clues:
+    get:
+      operationId: listClues
+      tags: [clues]
+      summary: Browse published clues
+      responses:
+        "200":
+          description: Published clue challenges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClueSummary"
+    post:
+      operationId: createClue
+      tags: [clues]
+      summary: Create a clue challenge
+      security:
+        - clerkSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClueInput"
+      responses:
+        "201":
+          description: Created clue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clue"
+  /clues/{slug}:
+    get:
+      operationId: getClue
+      tags: [clues]
+      summary: Get a shared clue challenge
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Clue challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clue"
+        "404":
+          description: Clue not found
+        "403":
+          description: Setters cannot compete on their own clue
+  /clues/{slug}/leaderboard:
+    get:
+      operationId: getClueLeaderboard
+      tags: [clues]
+      summary: Get a clue leaderboard
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ranked successful solves
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+  /clues/{slug}/attempts:
+    post:
+      operationId: submitAttempt
+      tags: [clues]
+      summary: Submit an answer attempt
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttemptInput"
+      responses:
+        "200":
+          description: Attempt result and updated progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttemptResult"
+        "404":
+          description: Clue not found
+        "403":
+          description: Setters cannot compete on their own clue
+  /clues/{slug}/start:
+    post:
+      operationId: startClue
+      tags: [clues]
+      summary: Start or resume a clue challenge
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current solver progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueStartResult"
+        "404":
+          description: Clue not found
+  /me/dashboard:
+    get:
+      operationId: getMyDashboard
+      tags: [profile]
+      summary: Get current user's clue and solve activity
+      security:
+        - clerkSession: []
+      responses:
+        "200":
+          description: Personal dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
 components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +183,88 @@ components:
           type: string
       required:
         - status
+    Clue:
+      type: object
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        clue: { type: string }
+        answerLength: { type: integer }
+        wordplay: { type: ["string", "null"] }
+        maxAttempts: { type: integer }
+        setterName: { type: string }
+        isOwner: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        userAttemptsUsed: { type: ["integer", "null"] }
+        userCompleted: { type: ["boolean", "null"] }
+        userElapsedSeconds: { type: ["integer", "null"] }
+        userStartedAt: { type: ["string", "null"], format: date-time }
+        userSolved: { type: ["boolean", "null"] }
+        revealedAnswer: { type: ["string", "null"] }
+    ClueSummary:
+      type: object
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, solveCount, createdAt]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        clue: { type: string }
+        answerLength: { type: integer }
+        maxAttempts: { type: integer }
+        setterName: { type: string }
+        solveCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+    ClueInput:
+      type: object
+      required: [clue, answer, wordplay, maxAttempts]
+      properties:
+        clue: { type: string, minLength: 4, maxLength: 240 }
+        answer: { type: string, minLength: 1, maxLength: 40 }
+        wordplay: { type: string, minLength: 1, maxLength: 1000 }
+        maxAttempts: { type: integer, minimum: 1, maximum: 10 }
+        displayName: { type: string, maxLength: 48 }
+    AttemptInput:
+      type: object
+      required: [answer]
+      properties:
+        answer: { type: string, minLength: 1, maxLength: 80 }
+        displayName: { type: string, maxLength: 48 }
+    AttemptResult:
+      type: object
+      required: [correct, attemptsUsed, attemptsRemaining, completed, elapsedSeconds]
+      properties:
+        correct: { type: boolean }
+        attemptsUsed: { type: integer }
+        attemptsRemaining: { type: integer }
+        completed: { type: boolean }
+        elapsedSeconds: { type: integer }
+        message: { type: string }
+    ClueStartResult:
+      type: object
+      required: [attemptsUsed, attemptsRemaining, completed, elapsedSeconds, startedAt]
+      properties:
+        attemptsUsed: { type: integer }
+        attemptsRemaining: { type: integer }
+        completed: { type: boolean }
+        elapsedSeconds: { type: integer }
+        startedAt: { type: string, format: date-time }
+    LeaderboardEntry:
+      type: object
+      required: [rank, displayName, elapsedSeconds, attemptsUsed, solvedAt]
+      properties:
+        rank: { type: integer }
+        displayName: { type: string }
+        elapsedSeconds: { type: integer }
+        attemptsUsed: { type: integer }
+        solvedAt: { type: string, format: date-time }
+    Dashboard:
+      type: object
+      required: [created, solved, recentClues]
+      properties:
+        created: { type: integer }
+        solved: { type: integer }
+        recentClues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClueSummary"
 
