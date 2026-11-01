@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 import { cluesTable } from "./clues";
 
@@ -15,7 +15,10 @@ export const clueRatingsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },
-  (table) => [uniqueIndex("clue_ratings_clue_user_idx").on(table.clueId, table.userId)],
+  (table) => [
+    uniqueIndex("clue_ratings_clue_user_idx").on(table.clueId, table.userId),
+    index("clue_ratings_clue_rating_idx").on(table.clueId, table.rating),
+  ],
 );
 
 export const insertClueRatingSchema = createInsertSchema(clueRatingsTable).omit({
