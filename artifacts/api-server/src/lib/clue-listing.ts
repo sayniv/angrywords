@@ -24,6 +24,63 @@ export function getClueListingOrder(
   return [desc(fields.createdAt), desc(fields.id)];
 }
 
+export type ClueListingSort = "newest" | "rating";
+
+export type ClueListingCursor = {
+  sort: ClueListingSort;
+  createdAt: string;
+  id: number;
+  averageRating: string | null;
+  ratingCount: number;
+};
+
+export function encodeClueListingCursor(cursor: ClueListingCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+export function decodeClueListingCursor(value: string): ClueListingCursor | null {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    if (!parsed || typeof parsed !== "object") return null;
+    const cursor = parsed as Partial<ClueListingCursor>;
+    if (
+      (cursor.sort !== "newest" && cursor.sort !== "rating")
+      || typeof cursor.createdAt !== "string"
+      || !Number.isFinite(Date.parse(cursor.createdAt))
+      || !Number.isInteger(cursor.id)
+      || (cursor.id ?? 0) < 1
+      || !Number.isInteger(cursor.ratingCount)
+      || (cursor.ratingCount ?? -1) < 0
+      || (cursor.averageRating !== null
+        && (typeof cursor.averageRating !== "string" || !Number.isFinite(Number(cursor.averageRating))))
+    ) {
+      return null;
+    }
+    return cursor as ClueListingCursor;
+  } catch {
+    return null;
+  }
+}
+
+export function getClueListingCursorCondition(
+  cursor: ClueListingCursor,
+  fields: {
+    averageRating: SQLWrapper;
+    ratingCount: SQLWrapper;
+    createdAt: SQLWrapper;
+    id: SQLWrapper;
+  },
+): SQL {
+  const earlierClue = sql`(${fields.createdAt} < ${cursor.createdAt} OR (${fields.createdAt} = ${cursor.createdAt} AND ${fields.id} < ${cursor.id}))`;
+  if (cursor.sort === "newest") return earlierClue;
+
+  const sameRatingEarlier = sql`(${fields.ratingCount} < ${cursor.ratingCount} OR (${fields.ratingCount} = ${cursor.ratingCount} AND ${earlierClue}))`;
+  if (cursor.averageRating === null) {
+    return sql`${fields.averageRating} IS NULL AND ${sameRatingEarlier}`;
+  }
+  return sql`(${fields.averageRating} IS NULL OR ${fields.averageRating} < ${cursor.averageRating} OR (${fields.averageRating} = ${cursor.averageRating} AND ${sameRatingEarlier}))`;
+}
+
 export function serializePublicClueSummary(
   clue: {
     id: number;

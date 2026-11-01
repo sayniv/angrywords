@@ -20,6 +20,7 @@ export * from './clueAppealResult';
 export * from './clueAppealResultStatus';
 export * from './clueAppealReview';
 export * from './clueAppealStatus';
+export * from './clueCatalogPage';
 export * from './clueHintReveal';
 export * from './clueInput';
 export * from './clueLeaderboard';

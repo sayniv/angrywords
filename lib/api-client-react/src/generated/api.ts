@@ -29,6 +29,7 @@ import type {
   ClueAppealInput,
   ClueAppealResult,
   ClueAppealReview,
+  ClueCatalogPage,
   ClueHintReveal,
   ClueInput,
   ClueLeaderboard,
@@ -39,7 +40,6 @@ import type {
   ClueReportResult,
   ClueRetired,
   ClueStartResult,
-  ClueSummary,
   Dashboard,
   GetMyActivityParams,
   HealthStatus,
@@ -175,9 +175,9 @@ export const getListCluesUrl = (params?: ListCluesParams,) => {
 /**
  * @summary Browse published clues
  */
-export const listClues = async (params?: ListCluesParams, options?: Parameters<typeof customFetch>[1]): Promise<ClueSummary[]> => {
+export const listClues = async (params?: ListCluesParams, options?: Parameters<typeof customFetch>[1]): Promise<ClueCatalogPage> => {
 
-  return customFetch<ClueSummary[]>(getListCluesUrl(params),
+  return customFetch<ClueCatalogPage>(getListCluesUrl(params),
   {
     ...options,
     method: 'GET'
@@ -197,7 +197,7 @@ export const getListCluesQueryKey = (params?: ListCluesParams,) => {
     }
 
 
-export const getListCluesQueryOptions = <TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<unknown>>(params?: ListCluesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListCluesQueryOptions = <TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<void>>(params?: ListCluesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -216,14 +216,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListCluesQueryResult = NonNullable<Awaited<ReturnType<typeof listClues>>>
-export type ListCluesQueryError = ErrorType<unknown>
+export type ListCluesQueryError = ErrorType<void>
 
 
 /**
  * @summary Browse published clues
  */
 
-export function useListClues<TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<unknown>>(
+export function useListClues<TData = Awaited<ReturnType<typeof listClues>>, TError = ErrorType<void>>(
  params?: ListCluesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClues>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {

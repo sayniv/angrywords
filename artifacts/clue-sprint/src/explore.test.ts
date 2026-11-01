@@ -7,6 +7,7 @@ import App, { ExplorePage, Header, HomePage } from './App';
 
 const api = vi.hoisted(() => ({
   listClues: vi.fn(),
+  infiniteQuery: vi.fn(),
   solverLeaderboard: vi.fn(),
   setterLeaderboard: vi.fn(),
 }));
@@ -23,15 +24,20 @@ vi.mock('@clerk/react/internal', () => ({
   publishableKeyFromHost: () => 'pk_test_clue_sprint',
 }));
 
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return { ...actual, useInfiniteQuery: api.infiniteQuery };
+});
+
 vi.mock('@workspace/api-client-react', () => ({
   getGetMyProfileQueryKey: () => ['profile'],
   getGetSolverLeaderboardQueryKey: () => ['solver-leaderboard'],
   getGetSetterLeaderboardQueryKey: () => ['setter-leaderboard'],
   getListCluesQueryKey: (params?: unknown) => ['clues', params],
+  listClues: api.listClues,
   useGetMyProfile: () => ({ data: undefined }),
   useGetSolverLeaderboard: api.solverLeaderboard,
   useGetSetterLeaderboard: api.setterLeaderboard,
-  useListClues: api.listClues,
 }));
 
 function renderWithRouter(element: ReactNode) {
@@ -58,6 +64,23 @@ function clue(id: number) {
     isBlocked: false,
     createdAt: '2026-11-01T12:00:00.000Z',
   };
+}
+
+function setupClueQuery(overrides: Record<string, unknown> = {}) {
+  const fetchNextPage = vi.fn();
+  const refetch = vi.fn();
+  api.infiniteQuery.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    refetch,
+    hasNextPage: false,
+    isFetchingNextPage: false,
+    isFetchNextPageError: false,
+    fetchNextPage,
+    ...overrides,
+  });
+  return { fetchNextPage, refetch };
 }
 
 describe('Home and Explore destinations', () => {
@@ -96,64 +119,70 @@ describe('Home and Explore destinations', () => {
     expect(api.listClues).not.toHaveBeenCalled();
   });
 
-  it('renders every clue returned by the catalog and keeps cards linked to their challenges', () => {
-    const clues = Array.from({ length: 35 }, (_, index) => clue(index + 1));
-    api.listClues.mockReturnValue({ data: clues, isLoading: false, isError: false, refetch: vi.fn() });
+  it('renders the first clue page and keeps cards linked to their challenges', () => {
+    const clues = Array.from({ length: 24 }, (_, index) => clue(index + 1));
+    setupClueQuery({ data: { pages: [{ items: clues, nextCursor: 'next-page' }] }, hasNextPage: true });
 
     renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
 
-    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(35);
-    expect(screen.getByTestId('card-clue-35').getAttribute('href')).toBe('/clue/clue-35');
-    expect(api.listClues).toHaveBeenCalledWith(
-      { sort: 'newest' },
-      expect.objectContaining({ query: expect.objectContaining({ queryKey: ['clues', { sort: 'newest' }] }) }),
-    );
+    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(24);
+    expect(screen.getByTestId('card-clue-24').getAttribute('href')).toBe('/clue/clue-24');
+    expect(screen.getByTestId('button-load-more-clues')).toBeTruthy();
+    expect(api.infiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ['clues', { sort: 'newest' }],
+      initialPageParam: null,
+      getNextPageParam: expect.any(Function),
+    }));
   });
 
-  it('offers the highest-rated route and retries failed catalog requests', async () => {
-    const retry = vi.fn();
-    api.listClues.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch: retry });
+  it('appends later pages without losing earlier clues and allows retrying a failed next page', async () => {
+    const { fetchNextPage } = setupClueQuery({
+      data: { pages: [{ items: [clue(2), clue(1)], nextCursor: 'next-page' }, { items: [clue(3)], nextCursor: null }] },
+      hasNextPage: true,
+      isFetchNextPageError: true,
+    });
 
     renderWithRouter(createElement(ExplorePage, { sort: 'rating' }));
 
     expect(screen.getByTestId('link-highest-rated').getAttribute('href')).toBe('/explore/popular');
     expect(screen.getByTestId('link-highest-rated').getAttribute('aria-current')).toBe('page');
-    expect(api.listClues).toHaveBeenCalledWith(
-      { sort: 'rating' },
-      expect.objectContaining({ query: expect.objectContaining({ queryKey: ['clues', { sort: 'rating' }] }) }),
-    );
+    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(3);
+    expect(screen.getByTestId('card-clue-2')).toBeTruthy();
+    expect(screen.getByTestId('card-clue-1')).toBeTruthy();
+    expect(screen.getByTestId('card-clue-3')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Your place is saved');
+    expect(screen.getByTestId('button-load-more-clues').textContent).toContain('Try again');
 
-    await userEvent.setup().click(screen.getByTestId('button-retry-clues'));
-    expect(retry).toHaveBeenCalledOnce();
+    await userEvent.setup().click(screen.getByTestId('button-load-more-clues'));
+    expect(fetchNextPage).toHaveBeenCalledOnce();
   });
 
   it('preserves loading and empty catalog states', () => {
-    api.listClues.mockReturnValue({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() });
+    setupClueQuery({ isLoading: true });
     const loadingView = renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
     expect(screen.getByLabelText('Loading clues')).toBeTruthy();
     loadingView.unmount();
 
-    api.listClues.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() });
+    setupClueQuery({ data: { pages: [{ items: [], nextCursor: null }] } });
     renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
     expect(screen.getByTestId('empty-playable-clues')).toBeTruthy();
   });
 
   it('opens the full playable catalog when /explore is loaded directly', () => {
-    api.listClues.mockReturnValue({ data: [clue(1), clue(2)], isLoading: false, isError: false, refetch: vi.fn() });
+    setupClueQuery({ data: { pages: [{ items: [clue(1), clue(2)], nextCursor: null }] } });
 
     renderAppAt('/explore');
 
     expect(screen.getByRole('heading', { name: 'Explore clues' })).toBeTruthy();
     expect(screen.getByTestId('link-all-clues').getAttribute('aria-current')).toBe('page');
     expect(screen.getByTestId('list-playable-clues').children).toHaveLength(2);
-    expect(api.listClues).toHaveBeenCalledWith(
-      { sort: 'newest' },
-      expect.objectContaining({ query: expect.objectContaining({ queryKey: ['clues', { sort: 'newest' }] }) }),
-    );
+    expect(api.infiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ['clues', { sort: 'newest' }],
+    }));
   });
 
   it('opens the highest-rated catalog when /explore/popular is loaded directly', () => {
-    api.listClues.mockReturnValue({ data: [clue(2), clue(1)], isLoading: false, isError: false, refetch: vi.fn() });
+    setupClueQuery({ data: { pages: [{ items: [clue(2), clue(1)], nextCursor: null }] } });
 
     renderAppAt('/explore/popular');
 
@@ -161,18 +190,24 @@ describe('Home and Explore destinations', () => {
     expect(screen.getByTestId('link-highest-rated').getAttribute('aria-current')).toBe('page');
     expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
       .toEqual(['card-clue-2', 'card-clue-1']);
-    expect(api.listClues).toHaveBeenCalledWith(
-      { sort: 'rating' },
-      expect.objectContaining({ query: expect.objectContaining({ queryKey: ['clues', { sort: 'rating' }] }) }),
-    );
+    expect(api.infiniteQuery).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ['clues', { sort: 'rating' }],
+    }));
   });
 
   it('keeps the selected view and ordering through browser back and forward', async () => {
-    api.listClues.mockImplementation(({ sort }: { sort: 'newest' | 'rating' }) => ({
-      data: sort === 'rating' ? [clue(2), clue(1)] : [clue(1), clue(2)],
+    api.infiniteQuery.mockImplementation((options: { queryKey: [string, { sort: 'newest' | 'rating' }] }) => ({
+      data: { pages: [{
+        items: options.queryKey[1].sort === 'rating' ? [clue(2), clue(1)] : [clue(1), clue(2)],
+        nextCursor: null,
+      }] },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage: vi.fn(),
     }));
 
     renderAppAt('/explore');
@@ -196,5 +231,14 @@ describe('Home and Explore destinations', () => {
       expect(Array.from(screen.getByTestId('list-playable-clues').children, (card) => card.getAttribute('data-testid')))
         .toEqual(['card-clue-2', 'card-clue-1']);
     });
+  });
+
+  it('retries an initial catalog failure', async () => {
+    const { refetch } = setupClueQuery({ isError: true });
+
+    renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
+
+    await userEvent.setup().click(screen.getByTestId('button-retry-clues'));
+    expect(refetch).toHaveBeenCalledOnce();
   });
 });

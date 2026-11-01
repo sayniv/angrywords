@@ -20,7 +20,7 @@ import {
   getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard, useGetCluePublishQuota,
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
-  useListClues, useRateClue, useReportClue, useRetireClue, useRevealClueHint, useStartClue, useSubmitAttempt, useUpdateMyProfile,
+  listClues, useRateClue, useReportClue, useRetireClue, useRevealClueHint, useStartClue, useSubmitAttempt, useUpdateMyProfile,
   type ClueLeaderboard, type SolverActivity,
 } from '@workspace/api-client-react';
 import {
@@ -473,9 +473,17 @@ export function HomePage() {
 }
 
 export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
-  const { data: clues, isLoading, isError, refetch } = useListClues({ sort }, {
-    query: { queryKey: getListCluesQueryKey({ sort }), staleTime: 15_000 },
+  const cluesQuery = useInfiniteQuery({
+    queryKey: getListCluesQueryKey({ sort }),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) => listClues(
+      { sort, ...(pageParam ? { cursor: pageParam } : {}) },
+      { signal },
+    ),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    staleTime: 15_000,
   });
+  const clues = cluesQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const isPopular = sort === 'rating';
   return (
     <div className="min-h-[100dvh]">
@@ -495,13 +503,13 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
               </nav>
             </div>
           </div>
-          {isLoading ? <ClueSkeletons /> : isError ? (
+          {cluesQuery.isLoading ? <ClueSkeletons /> : cluesQuery.isError && !clues.length ? (
             <div className="state-panel" role="alert">
               <h2>Clues are taking a breather.</h2>
               <p>Give it another try in a moment.</p>
-              <button className="button button-outline" type="button" data-testid="button-retry-clues" onClick={() => void refetch()}>Try again <RotateCcw size={15} /></button>
+              <button className="button button-outline" type="button" data-testid="button-retry-clues" onClick={() => void cluesQuery.refetch()}>Try again <RotateCcw size={15} /></button>
             </div>
-          ) : clues?.length ? (
+          ) : clues.length ? (
             <div className="clue-grid" data-testid="list-playable-clues">
               {clues.map((clue, index) => <ClueCard key={clue.id} clue={clue} index={index} />)}
             </div>
@@ -510,6 +518,20 @@ export function ExplorePage({ sort }: { sort: 'newest' | 'rating' }) {
               <div className="empty-stamp"><Feather size={27} /></div>
               <div><h3>It's quiet on the clue front.</h3><p>Be the first to leave a little wordplay behind.</p></div>
               <Link href="/sign-up" className="button button-primary">Set the first clue <ArrowRight size={15} /></Link>
+            </div>
+          )}
+          {cluesQuery.hasNextPage && (
+            <div className="catalog-load-more">
+              {cluesQuery.isFetchNextPageError && <p className="activity-load-error" role="alert">More clues could not be loaded. Your place is saved; try again.</p>}
+              <button
+                className="button button-outline"
+                type="button"
+                data-testid="button-load-more-clues"
+                disabled={cluesQuery.isFetchingNextPage}
+                onClick={() => void cluesQuery.fetchNextPage()}
+              >
+                {cluesQuery.isFetchingNextPage ? 'Loading more clues…' : cluesQuery.isFetchNextPageError ? 'Try again' : 'Load more clues'} <ArrowDownRight size={15} />
+              </button>
             </div>
           )}
           <div className="bottom-invite"><span className="invite-star"><Sparkles size={18} /></span><p>Have a clue rattling around in your head?</p><Link href="/sign-up">Bring it to the table <ArrowRight size={15} /></Link></div>

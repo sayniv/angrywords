@@ -41,6 +41,7 @@ import {
   GetMyActivityQueryParams,
   GetMyActivityResponse,
   RevealClueHintResponse,
+  ListCluesQueryParams,
 } from "@workspace/api-zod";
 import {
   db,
@@ -82,6 +83,9 @@ import { buildClueLeaderboardEntries } from "../lib/clue-leaderboard";
 import { getGuessFeedback } from "../lib/guess-feedback";
 
 import {
+  decodeClueListingCursor,
+  encodeClueListingCursor,
+  getClueListingCursorCondition,
   getClueListingOrder,
   getPlayableClueFilter,
   serializePublicClueSummary,
@@ -90,6 +94,7 @@ import {
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
 const SOLVER_ACTIVITY_PAGE_SIZE = 10;
+const PUBLIC_CLUE_PAGE_SIZE = 24;
 const REVIEWER_USER_IDS = new Set(
   (process.env.CLUE_REVIEWER_USER_IDS ?? "")
     .split(",")
@@ -292,7 +297,18 @@ async function clueRatingSummaries(
 }
 
 router.get("/clues", async (req, res): Promise<void> => {
-  const sortByRating = req.query.sort === "rating";
+  const parsedQuery = ListCluesQueryParams.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res.status(400).json({ error: "Invalid clue listing query." });
+    return;
+  }
+  const sort = parsedQuery.data.sort ?? "newest";
+  const sortByRating = sort === "rating";
+  const cursor = parsedQuery.data.cursor ? decodeClueListingCursor(parsedQuery.data.cursor) : null;
+  if (parsedQuery.data.cursor && (!cursor || cursor.sort !== sort)) {
+    res.status(400).json({ error: "This clue page cursor is invalid. Refresh the catalog and try again." });
+    return;
+  }
   const ratings = db
     .select({
       clueId: clueRatingsTable.clueId,
@@ -302,7 +318,17 @@ router.get("/clues", async (req, res): Promise<void> => {
     .from(clueRatingsTable)
     .groupBy(clueRatingsTable.clueId)
     .as("clue_rating_summary");
-  const clues = await db
+  const ratingCountForSort = sql`coalesce(${ratings.ratingCount}, 0)`;
+  const filters = [getPlayableClueFilter(cluesTable.retiredAt, cluesTable.blockedAt)];
+  if (cursor) {
+    filters.push(getClueListingCursorCondition(cursor, {
+      averageRating: ratings.averageRating,
+      ratingCount: ratingCountForSort,
+      createdAt: cluesTable.createdAt,
+      id: cluesTable.id,
+    }));
+  }
+  const pageRows = await db
     .select({
       id: cluesTable.id,
       slug: cluesTable.slug,
@@ -313,18 +339,22 @@ router.get("/clues", async (req, res): Promise<void> => {
       setterName: cluesTable.setterName,
       blockedAt: cluesTable.blockedAt,
       createdAt: cluesTable.createdAt,
+      cursorCreatedAt: sql<string>`to_char(${cluesTable.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
       averageRating: ratings.averageRating,
       ratingCount: ratings.ratingCount,
     })
     .from(cluesTable)
     .leftJoin(ratings, eq(ratings.clueId, cluesTable.id))
-    .where(getPlayableClueFilter(cluesTable.retiredAt, cluesTable.blockedAt))
+    .where(and(...filters))
     .orderBy(...getClueListingOrder(sortByRating, {
       averageRating: ratings.averageRating,
-      ratingCount: ratings.ratingCount,
+      ratingCount: ratingCountForSort,
       createdAt: cluesTable.createdAt,
       id: cluesTable.id,
-    }));
+    }))
+    .limit(PUBLIC_CLUE_PAGE_SIZE + 1);
+  const hasMore = pageRows.length > PUBLIC_CLUE_PAGE_SIZE;
+  const clues = pageRows.slice(0, PUBLIC_CLUE_PAGE_SIZE);
   const counts = await solveCounts(clues.map((clue) => clue.id));
   const publicProfiles = await publicProfilesForUsers(clues.map((clue) => clue.setterUserId));
   const response = clues.map((clue) =>
@@ -334,7 +364,17 @@ router.get("/clues", async (req, res): Promise<void> => {
       publicProfiles.get(clue.setterUserId),
     ),
   );
-  res.json(ListCluesResponse.parse(response));
+  const lastClue = clues.at(-1);
+  const nextCursor = hasMore && lastClue
+    ? encodeClueListingCursor({
+      sort,
+      createdAt: lastClue.cursorCreatedAt,
+      id: lastClue.id,
+      averageRating: lastClue.averageRating == null ? null : String(lastClue.averageRating),
+      ratingCount: Number(lastClue.ratingCount ?? 0),
+    })
+    : null;
+  res.json(ListCluesResponse.parse({ items: response, nextCursor }));
 });
 
 router.get("/clues/publishing-quota", requireAuth, async (req, res): Promise<void> => {

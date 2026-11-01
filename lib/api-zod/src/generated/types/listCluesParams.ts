@@ -9,4 +9,9 @@ import type { ListCluesSort } from './listCluesSort';
 
 export type ListCluesParams = {
 sort?: ListCluesSort;
+/**
+ * Opaque cursor returned by the previous clue page
+ * @maxLength 512
+ */
+cursor?: string;
 };

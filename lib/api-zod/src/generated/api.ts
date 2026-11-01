@@ -20,11 +20,17 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Browse published clues
  */
+export const listCluesQueryCursorMax = 512;
+
+
+
 export const ListCluesQueryParams = zod.object({
-  "sort": zod.enum(['newest', 'rating']).optional()
+  "sort": zod.enum(['newest', 'rating']).optional(),
+  "cursor": zod.coerce.string().max(listCluesQueryCursorMax).optional().describe('Opaque cursor returned by the previous clue page')
 })
 
-export const ListCluesResponseItem = zod.object({
+export const ListCluesResponse = zod.object({
+  "items": zod.array(zod.object({
   "id": zod.number().int(),
   "slug": zod.string(),
   "clue": zod.string(),
@@ -37,8 +43,9 @@ export const ListCluesResponseItem = zod.object({
   "ratingCount": zod.number().int(),
   "isBlocked": zod.boolean(),
   "createdAt": zod.coerce.date()
+})),
+  "nextCursor": zod.string().nullable()
 })
-export const ListCluesResponse = zod.array(ListCluesResponseItem)
 
 
 /**

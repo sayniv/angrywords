@@ -42,15 +42,22 @@ paths:
           schema:
             type: string
             enum: [newest, rating]
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor returned by the previous clue page
+          schema:
+            type: string
+            maxLength: 512
       responses:
         "200":
-          description: Published clue challenges
+          description: A stable page of published clue challenges
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ClueSummary"
+                $ref: "#/components/schemas/ClueCatalogPage"
+        "400":
+          description: Invalid clue listing cursor
     post:
       operationId: createClue
       tags: [clues]
@@ -657,6 +664,15 @@ components:
         ratingCount: { type: integer }
         isBlocked: { type: boolean }
         createdAt: { type: string, format: date-time }
+    ClueCatalogPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClueSummary"
+        nextCursor: { type: ["string", "null"] }
     ClueInput:
       type: object
       required: [clue, answer, wordplay, maxAttempts]

@@ -86,6 +86,12 @@ export interface ClueSummary {
   createdAt: string;
 }
 
+export interface ClueCatalogPage {
+  items: ClueSummary[];
+  /** @nullable */
+  nextCursor: string | null;
+}
+
 export interface ClueInput {
   /**
      * @minLength 4
@@ -366,6 +372,11 @@ export interface SetterLeaderboardEntry {
 
 export type ListCluesParams = {
 sort?: ListCluesSort;
+/**
+ * Opaque cursor returned by the previous clue page
+ * @maxLength 512
+ */
+cursor?: string;
 };
 
 export type ListCluesSort = typeof ListCluesSort[keyof typeof ListCluesSort];
