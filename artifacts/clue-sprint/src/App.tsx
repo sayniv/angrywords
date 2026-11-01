@@ -22,7 +22,7 @@ import {
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   listClues, useRateClue, useReportClue, useRetireClue, useRevealClueHint, useStartClue, useSubmitAttempt, useUpdateMyProfile,
-  type ClueLeaderboard, type SolverActivity,
+  type SolverActivity,
 } from '@workspace/api-client-react';
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
@@ -50,6 +50,13 @@ const queryClient = new QueryClient({
 });
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+type ClueLeaderboardEntry = {
+  rank: number;
+  displayName: string;
+  elapsedSeconds: number;
+  attemptsUsed: number;
+  solvedAt: string;
+};
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
@@ -584,17 +591,22 @@ function PublicLeaderboard({ title, note, mode, data, loading, failed, retry }: 
   </section>;
 }
 
-function ClueLeaderboardSection({ title, category, entries, loading, failed, retry }: {
-  title: string;
+export function ClueLeaderboardSection({ tier, description, category, entries, loading, failed, retry }: {
+  tier: 'gold' | 'silver' | 'bronze';
+  description: string;
   category: 'gold' | 'hints-no-assist' | 'assist';
-  entries?: ClueLeaderboard['noHintsNoAssist'];
+  entries?: ClueLeaderboardEntry[];
   loading: boolean;
   failed: boolean;
   retry: () => void;
 }) {
   const headingId = `clue-board-${category}-heading`;
-  return <section className="clue-board-category" aria-labelledby={headingId} data-testid={`section-leaderboard-${category}`}>
-    <h3 id={headingId}>{title}</h3>
+  const title = tier[0].toUpperCase() + tier.slice(1);
+  return <section className={`clue-board-category clue-board-${tier}`} aria-labelledby={headingId} data-testid={`section-leaderboard-${category}`}>
+    <div className="clue-board-title">
+      <h3 id={headingId}>{title}</h3>
+      <span>{description}</span>
+    </div>
     {loading ? <LeaderboardSkeleton /> : failed ? (
       <div className="board-empty" role="alert">
         <p>Could not load this board just now.</p>
@@ -603,7 +615,9 @@ function ClueLeaderboardSection({ title, category, entries, loading, failed, ret
     ) : entries?.length ? (
       <ol className="leaderboard" data-testid={`list-leaderboard-${category}`}>
         {entries.map((entry) => <li className={`leader-row ${entry.rank === 1 ? 'leader-first' : ''}`} key={`${entry.rank}-${entry.displayName}-${entry.solvedAt}`} data-testid={`row-leader-${category}-${entry.rank}`}>
-          <span className={`rank-badge rank-${entry.rank}`}>{entry.rank === 1 ? <Crown size={15} /> : String(entry.rank).padStart(2, '0')}</span>
+          <span className={`rank-badge rank-${entry.rank} tier-rank-badge`} aria-label={`${entry.rank}${entry.rank === 1 ? 'st' : entry.rank === 2 ? 'nd' : entry.rank === 3 ? 'rd' : 'th'} place`}>
+            {entry.rank === 1 ? <TierWinnerIcon tier={tier} /> : String(entry.rank).padStart(2, '0')}
+          </span>
           <div className="leader-person"><strong>{entry.displayName}</strong><span>{entry.attemptsUsed} {entry.attemptsUsed === 1 ? 'guess' : 'guesses'}</span></div>
           <span className="leader-time">{formatTime(entry.elapsedSeconds)}</span>
         </li>)}
@@ -622,6 +636,25 @@ function ClueLeaderboardSection({ title, category, entries, loading, failed, ret
       </div>
     )}
   </section>;
+}
+
+function TierWinnerIcon({ tier }: { tier: 'gold' | 'silver' | 'bronze' }) {
+  if (tier === 'gold') return <Crown size={16} aria-hidden="true" focusable="false" />;
+  if (tier === 'silver') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M7 3h10v3c0 4-2 7-5 7s-5-3-5-7V3Z" />
+        <path d="M7 5H4v2c0 3 2 5 5 5M17 5h3v2c0 3-2 5-5 5M12 13v5m-4 3h8m-7-3h6v3H9z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path className="duck-body" d="M3 15c1-2 3-3 6-3 1-4 4-6 7-5-1 1-1 2 0 3 2 0 4 1 5 2l-4 1c-.5 3-3 5-7 5H6l-3 2v-3c0-1 0-2 0-2Z" />
+      <path className="duck-beak" d="m17 10 4 2-4 1z" />
+      <circle className="duck-eye" cx="15.5" cy="9.5" r=".7" />
+    </svg>
+  );
 }
 
 function Step({ number, icon, title, text }: { number: string; icon: ReactNode; title: string; text: string }) {
@@ -1134,7 +1167,8 @@ function ChallengePage() {
           <div className="board-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> THE RACE SO FAR</div><h2>Fastest solves</h2></div><Trophy size={22} /></div>
           <p className="board-subtitle">Each run appears on one board based on its assist and hint settings.</p>
           <ClueLeaderboardSection
-            title="Gold · No hints, no assist"
+            tier="gold"
+            description="No hints · No assist"
             category="gold"
             entries={leaderboard?.noHintsNoAssist}
             loading={leaderboardLoading}
@@ -1142,7 +1176,8 @@ function ChallengePage() {
             retry={() => void refetchLeaderboard()}
           />
           <ClueLeaderboardSection
-            title="Hints · No assist"
+            tier="silver"
+            description="Hints · No assist"
             category="hints-no-assist"
             entries={leaderboard?.hintsUsedNoAssist}
             loading={leaderboardLoading}
@@ -1150,7 +1185,8 @@ function ChallengePage() {
             retry={() => void refetchLeaderboard()}
           />
           <ClueLeaderboardSection
-            title="Assist · With or without hints"
+            tier="bronze"
+            description="Assist · With or without hints"
             category="assist"
             entries={leaderboard?.assistUsed}
             loading={leaderboardLoading}

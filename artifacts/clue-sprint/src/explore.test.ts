@@ -1,9 +1,11 @@
 import { createElement, type ReactNode } from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Router } from 'wouter';
-import App, { BrowseCluesLink, ExplorePage, Header, HomePage, NextClueRecommendation } from './App';
+import App, { BrowseCluesLink, ClueLeaderboardSection, ExplorePage, Header, HomePage, NextClueRecommendation } from './App';
 
 const api = vi.hoisted(() => ({
   listClues: vi.fn(),
@@ -66,6 +68,22 @@ function renderWithRouter(element: ReactNode) {
 function renderAppAt(path: string) {
   window.history.replaceState({}, '', path);
   return render(createElement(App));
+}
+
+function renderClueLeaderboard(tier: 'gold' | 'silver' | 'bronze', category: 'gold' | 'hints-no-assist' | 'assist', overrides: Record<string, unknown> = {}) {
+  const defaults = {
+    tier,
+    description: 'Tier board description',
+    category,
+    entries: [
+      { rank: 1, displayName: 'First solver', elapsedSeconds: 63, attemptsUsed: 1, solvedAt: '2026-11-01T12:00:00Z' },
+      { rank: 2, displayName: 'Second solver', elapsedSeconds: 81, attemptsUsed: 2, solvedAt: '2026-11-01T12:01:00Z' },
+    ],
+    loading: false,
+    failed: false,
+    retry: vi.fn(),
+  };
+  return render(createElement(ClueLeaderboardSection, { ...defaults, ...overrides } as Parameters<typeof ClueLeaderboardSection>[0]));
 }
 
 function clue(id: number) {
@@ -491,5 +509,81 @@ describe('Home and Explore destinations', () => {
     window.history.replaceState({}, '', '/clue/missing-clue');
     render(createElement(App));
     expect(screen.getByRole('heading', { name: 'This clue has slipped away.' })).toBeTruthy();
+  });
+});
+
+describe('Race So Far medal tiers', () => {
+  afterEach(() => cleanup());
+
+  it('labels the existing boards gold, silver, and bronze in their current order', () => {
+    const tiers = [
+      { tier: 'gold', category: 'gold', title: 'Gold' },
+      { tier: 'silver', category: 'hints-no-assist', title: 'Silver' },
+      { tier: 'bronze', category: 'assist', title: 'Bronze' },
+    ] as const;
+    const view = render(createElement('div', null, ...tiers.map(({ tier, category }) => createElement(ClueLeaderboardSection, {
+      key: tier,
+      tier,
+      description: 'Tier board description',
+      category,
+      entries: [],
+      loading: false,
+      failed: false,
+      retry: vi.fn(),
+    }))));
+
+    expect(Array.from(view.container.querySelectorAll('h3'), (heading) => heading.textContent))
+      .toEqual(tiers.map(({ title }) => title));
+    tiers.forEach(({ tier, category }) => {
+      expect(screen.getByTestId(`section-leaderboard-${category}`).classList.contains(`clue-board-${tier}`)).toBe(true);
+    });
+  });
+
+  it('shows the requested first-place icons while keeping later ranks numeric', () => {
+    const tiers = [
+      { tier: 'gold', category: 'gold', icon: 'lucide-crown' },
+      { tier: 'silver', category: 'hints-no-assist', icon: 'chalice' },
+      { tier: 'bronze', category: 'assist', icon: 'duck' },
+    ] as const;
+
+    tiers.forEach(({ tier, category, icon }) => {
+      const view = renderClueLeaderboard(tier, category);
+      const section = screen.getByTestId(`section-leaderboard-${category}`);
+      const winner = section.querySelector('[aria-label="1st place"]');
+      const iconSvg = winner?.querySelector('svg');
+
+      expect(screen.getByRole('heading', { level: 3, name: tier[0].toUpperCase() + tier.slice(1) })).toBeTruthy();
+      expect(winner).toBeTruthy();
+      expect(iconSvg?.getAttribute('aria-hidden')).toBe('true');
+      if (icon === 'lucide-crown') expect(iconSvg?.getAttribute('class')).toContain(icon);
+      if (icon === 'chalice') expect(iconSvg?.querySelectorAll('path').length).toBe(2);
+      if (icon === 'duck') expect(iconSvg?.querySelector('.duck-body')).toBeTruthy();
+      expect(screen.getByTestId(`row-leader-${category}-2`).querySelector('.rank-badge')?.textContent).toBe('02');
+      view.unmount();
+    });
+  });
+
+  it('defines distinct heading and rank accent colors for all three tiers', () => {
+    const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
+    for (const tier of ['gold', 'silver', 'bronze']) {
+      expect(css).toContain(`.clue-board-${tier} .clue-board-title h3`);
+      expect(css).toContain(`.clue-board-${tier} .tier-rank-badge`);
+    }
+  });
+
+  it('preserves loading, empty, error, and retry states', async () => {
+    const loading = renderClueLeaderboard('gold', 'gold', { entries: undefined, loading: true });
+    expect(loading.container.querySelector('.leader-skeleton')).toBeTruthy();
+    loading.unmount();
+
+    const empty = renderClueLeaderboard('silver', 'hints-no-assist', { entries: [] });
+    expect(screen.getByText('No hint-used solves yet.')).toBeTruthy();
+    empty.unmount();
+
+    const retry = vi.fn();
+    renderClueLeaderboard('bronze', 'assist', { entries: undefined, failed: true, retry });
+    expect(screen.getByRole('alert').textContent).toContain('Could not load this board just now.');
+    await userEvent.setup().click(screen.getByTestId('button-retry-leaderboard-assist'));
+    expect(retry).toHaveBeenCalledOnce();
   });
 });

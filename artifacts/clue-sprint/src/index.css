@@ -682,6 +682,12 @@
 .board-subtitle { margin: 8px 0 18px; color: #817366; font-size: 11px; }
 .clue-board-category { margin-top: 20px; padding-top: 17px; border-top: 1px solid #dbd0bf; }
 .clue-board-category h3 { margin: 0 0 10px; color: var(--ink); font: 600 18px var(--app-font-serif); letter-spacing: -.025em; }
+.clue-board-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.clue-board-title h3 { margin: 0; }
+.clue-board-title > span { color: #82766a; font: 9px/1.4 var(--app-font-mono); text-align: right; }
+.clue-board-gold .clue-board-title h3 { color: #765711; }
+.clue-board-silver .clue-board-title h3 { color: #536170; }
+.clue-board-bronze .clue-board-title h3 { color: #8f4e2c; }
 .clue-board-category .board-empty { min-height: 136px; }
 .clue-board-category .leaderboard { border-top: 0; }
 .clue-board-category .leader-row:first-child { padding-top: 4px; }
@@ -689,6 +695,14 @@
 .leader-row { display: flex; align-items: center; gap: 11px; padding: 13px 0; border-bottom: 1px solid #dbd0bf; }
 .rank-badge { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; color: #877866; background: #f9f5ec; border: 1px solid #d9cebd; border-radius: 50%; font: 10px var(--app-font-mono); }
 .rank-1 { color: #755b19; background: #f3de92; border-color: #e4ca68; }
+.clue-board-gold .tier-rank-badge { color: #765711; background: #f3de92; border-color: #e4ca68; }
+.clue-board-silver .tier-rank-badge { color: #536170; background: #e3e8eb; border-color: #c2cbd1; }
+.clue-board-bronze .tier-rank-badge { color: #8f4e2c; background: #ecd0bd; border-color: #d9ad91; }
+.tier-rank-badge svg { width: 16px; height: 16px; }
+.clue-board-silver .tier-rank-badge svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.clue-board-bronze .tier-rank-badge .duck-body { fill: currentColor; stroke: none; }
+.clue-board-bronze .tier-rank-badge .duck-beak { fill: #bd7b31; stroke: none; }
+.clue-board-bronze .tier-rank-badge .duck-eye { fill: #382c24; }
 .leader-person { display: grid; gap: 3px; min-width: 0; }
 .leader-person strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .leader-person span { color: #978675; font-size: 9px; }
