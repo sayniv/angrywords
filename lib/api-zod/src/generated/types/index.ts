@@ -21,6 +21,7 @@ export * from './clueAppealReview';
 export * from './clueAppealStatus';
 export * from './clueInput';
 export * from './cluePublishLimitError';
+export * from './cluePublishQuota';
 export * from './clueRatingInput';
 export * from './clueRatingSummary';
 export * from './clueReportResult';

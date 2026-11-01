@@ -109,6 +109,13 @@ export interface CluePublishLimitError {
   error: string;
 }
 
+export interface CluePublishQuota {
+  limit: number;
+  publishedToday: number;
+  remaining: number;
+  resetsAt: string;
+}
+
 export interface AttemptInput {
   /**
      * @minLength 1

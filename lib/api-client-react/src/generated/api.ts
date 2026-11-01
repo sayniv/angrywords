@@ -31,6 +31,7 @@ import type {
   ClueAppealReview,
   ClueInput,
   CluePublishLimitError,
+  CluePublishQuota,
   ClueRatingInput,
   ClueRatingSummary,
   ClueReportResult,
@@ -323,6 +324,83 @@ export const useCreateClue = <TError = ErrorType<void | CluePublishLimitError>,
       > => {
       return useMutation(getCreateClueMutationOptions(options));
     }
+
+export const getGetCluePublishQuotaUrl = () => {
+
+
+
+
+  return `/api/clues/publishing-quota`
+}
+
+/**
+ * @summary Get the signed-in setter's daily publication quota
+ */
+export const getCluePublishQuota = async ( options?: Parameters<typeof customFetch>[1]): Promise<CluePublishQuota> => {
+
+  return customFetch<CluePublishQuota>(getGetCluePublishQuotaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCluePublishQuotaQueryKey = () => {
+    return [
+    `/api/clues/publishing-quota`
+    ] as const;
+    }
+
+
+export const getGetCluePublishQuotaQueryOptions = <TData = Awaited<ReturnType<typeof getCluePublishQuota>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCluePublishQuota>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCluePublishQuotaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCluePublishQuota>>> = ({ signal }) => getCluePublishQuota({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCluePublishQuota>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCluePublishQuotaQueryResult = NonNullable<Awaited<ReturnType<typeof getCluePublishQuota>>>
+export type GetCluePublishQuotaQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in setter's daily publication quota
+ */
+
+export function useGetCluePublishQuota<TData = Awaited<ReturnType<typeof getCluePublishQuota>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCluePublishQuota>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCluePublishQuotaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetClueUrl = (slug: string,) => {
 

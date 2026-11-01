@@ -6,6 +6,7 @@ import {
   AttemptResult,
   CreateClueBody,
   CreateClueResponse,
+  GetCluePublishQuotaResponse,
   GetClueLeaderboardParams,
   GetClueLeaderboardResponse,
   GetClueParams,
@@ -50,6 +51,8 @@ import {
 } from "@workspace/db";
 import { containsObjectionableLanguage } from "../lib/content-moderation";
 import {
+  DAILY_CLUE_PUBLISH_LIMIT,
+  getUtcDayBounds,
   getSetterPublishLockSql,
   publishClueWithinDailyLimit,
 } from "../lib/daily-clue-publishing";
@@ -322,6 +325,30 @@ router.get("/clues", async (req, res): Promise<void> => {
     createdAt: clue.createdAt,
   }));
   res.json(ListCluesResponse.parse(response));
+});
+
+router.get("/clues/publishing-quota", requireAuth, async (req, res): Promise<void> => {
+  const userId = getAuth(req).userId!;
+  const { start, end } = getUtcDayBounds(new Date());
+  const [result] = await db
+    .select({ total: count() })
+    .from(cluesTable)
+    .where(
+      and(
+        eq(cluesTable.setterUserId, userId),
+        gte(cluesTable.createdAt, start),
+        lt(cluesTable.createdAt, end),
+      ),
+    );
+  const publishedToday = Number(result.total);
+  res.json(
+    GetCluePublishQuotaResponse.parse({
+      limit: DAILY_CLUE_PUBLISH_LIMIT,
+      publishedToday,
+      remaining: Math.max(0, DAILY_CLUE_PUBLISH_LIMIT - publishedToday),
+      resetsAt: end,
+    }),
+  );
 });
 
 router.post("/clues", requireAuth, async (req, res): Promise<void> => {

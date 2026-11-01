@@ -15,9 +15,9 @@ import {
 } from 'lucide-react';
 import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
-  getGetMyProfileQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
+  getGetMyProfileQueryKey, getGetCluePublishQuotaQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
   getListPendingClueAppealsQueryKey,
-  getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard,
+  getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard, useGetCluePublishQuota,
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
@@ -495,6 +495,14 @@ function CreatePage() {
   const [, setLocation] = useLocation();
   const cache = useQueryClient();
   const createClue = useCreateClue();
+  const publishQuota = useGetCluePublishQuota({
+    query: {
+      queryKey: getGetCluePublishQuotaQueryKey(),
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: 'always',
+    },
+  });
   const [clue, setClue] = useState('');
   const [answer, setAnswer] = useState('');
   const [wordplay, setWordplay] = useState('');
@@ -502,6 +510,30 @@ function CreatePage() {
   const [error, setError] = useState('');
   const [review, setReview] = useState(false);
   const normalizedAnswer = answer.trim().replace(/[^a-z0-9]/gi, '');
+  useEffect(() => {
+    const resetsAt = publishQuota.data?.resetsAt;
+    if (!resetsAt) return;
+    const delay = Date.parse(resetsAt) - Date.now();
+    if (delay <= 0) {
+      void publishQuota.refetch();
+      return;
+    }
+    const timeout = window.setTimeout(() => void publishQuota.refetch(), delay + 100);
+    return () => window.clearTimeout(timeout);
+  }, [publishQuota.data?.resetsAt, publishQuota.refetch]);
+  const quotaMessage = publishQuota.isLoading
+    ? 'Checking today’s publishing count…'
+    : publishQuota.isError || !publishQuota.data
+      ? 'Today’s publishing count is unavailable; the limit is still enforced.'
+      : publishQuota.data.remaining === 0
+        ? `You’ve used all ${publishQuota.data.limit} publications today. The count resets at 00:00 UTC.`
+        : `You can publish ${publishQuota.data.remaining} more ${publishQuota.data.remaining === 1 ? 'clue' : 'clues'} today (${publishQuota.data.publishedToday} of ${publishQuota.data.limit} used).`;
+  const publishQuotaStatus = (
+    <p className="form-footnote" role="status" data-testid="status-publish-quota">
+      {quotaMessage}
+      {publishQuota.isError && <> <button type="button" className="text-button" onClick={() => void publishQuota.refetch()}>Try again</button></>}
+    </p>
+  );
   const validateDraft = () => {
     setError('');
     if (clue.trim().length < 4) { setError('A clue needs at least four characters.'); return false; }
@@ -528,6 +560,7 @@ function CreatePage() {
       await Promise.all([
         cache.invalidateQueries({ queryKey: getListCluesQueryKey() }),
         cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+        cache.invalidateQueries({ queryKey: getGetCluePublishQuotaQueryKey() }),
       ]);
       setLocation(`/clue/${created.slug}`);
     } catch (cause) {
@@ -542,6 +575,7 @@ function CreatePage() {
       </div>
       {!review ? <form className="paper-form" onSubmit={submitDraft}>
         <div className="form-heading"><span className="form-index">01 / THE CLUE</span><h2>What will they solve?</h2></div>
+        {publishQuotaStatus}
         <label className="field-label" htmlFor="clue-text">Your cryptic clue</label>
         <textarea id="clue-text" data-testid="input-clue" value={clue} onChange={(e) => setClue(e.target.value)} placeholder="Example: Bird in a muddle, perhaps (5)" maxLength={240} required rows={3} />
         <div className="field-hint"><span>Just the clue. No answer clues.</span><span>{clue.length}/240</span></div>
@@ -564,6 +598,7 @@ function CreatePage() {
       </form> : <section className="paper-form publish-review" data-testid="panel-publish-review">
         <div className="form-heading"><span className="form-index">FINAL CHECK / BEFORE THE SPRINT</span><h2>Read it once as a solver.</h2></div>
         <p className="review-intro">Here is exactly what will be published. You can publish up to 10 clues per UTC day; the limit resets at 00:00 UTC.</p>
+        {publishQuotaStatus}
         <dl className="review-details">
           <div><dt>Cryptic clue</dt><dd data-testid="review-clue">{clue.trim()}</dd></div>
           <div><dt>Answer</dt><dd data-testid="review-answer">{normalizedAnswer.toUpperCase()}</dd></div>

@@ -91,6 +91,17 @@ export const CreateClueResponse = zod.object({
 
 
 /**
+ * @summary Get the signed-in setter's daily publication quota
+ */
+export const GetCluePublishQuotaResponse = zod.object({
+  "limit": zod.number().int(),
+  "publishedToday": zod.number().int(),
+  "remaining": zod.number().int(),
+  "resetsAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Get a shared clue challenge
  */
 export const GetClueParams = zod.object({

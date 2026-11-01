@@ -78,6 +78,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CluePublishLimitError"
+  /clues/publishing-quota:
+    get:
+      operationId: getCluePublishQuota
+      tags: [clues]
+      summary: Get the signed-in setter's daily publication quota
+      security:
+        - clerkSession: []
+      responses:
+        "200":
+          description: Current UTC-day publication quota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CluePublishQuota"
+        "401":
+          description: Sign in to view publication quota
   /clues/{slug}:
     get:
       operationId: getClue
@@ -591,6 +607,14 @@ components:
       required: [error]
       properties:
         error: { type: string }
+    CluePublishQuota:
+      type: object
+      required: [limit, publishedToday, remaining, resetsAt]
+      properties:
+        limit: { type: integer }
+        publishedToday: { type: integer }
+        remaining: { type: integer }
+        resetsAt: { type: string, format: date-time }
     AttemptInput:
       type: object
       required: [answer]
