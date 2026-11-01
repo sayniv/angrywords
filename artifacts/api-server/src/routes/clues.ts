@@ -46,6 +46,11 @@ import {
   userProfilesTable,
 } from "@workspace/db";
 import { containsObjectionableLanguage } from "../lib/content-moderation";
+import {
+  getClueProgressState,
+  getCompletedAttemptResult,
+  hasSuccessfulSolve,
+} from "../lib/clue-progress";
 
 const router: IRouter = Router();
 const CLUE_REPORT_BLOCK_THRESHOLD = 100;
@@ -478,15 +483,13 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
         .where(eq(clueReportsTable.clueId, clue.id))
     : [];
 
+  const progressState = getClueProgressState(progress, isOwner);
   const response = {
     id: clue.id,
     slug: clue.slug,
     clue: clue.clue,
     answerLength: normalizeAnswer(clue.answer).length,
-    wordplay:
-      clue.setterUserId === userId || progress?.solvedAt || progress?.failedAt
-        ? clue.wordplay
-        : null,
+    wordplay: progressState.revealSolution ? clue.wordplay : null,
     maxAttempts: clue.maxAttempts,
     setterName: setterProfile?.publicId ?? clue.setterName,
     setterBlurb: setterProfile?.blurb ?? null,
@@ -498,14 +501,11 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     isOwner,
     createdAt: clue.createdAt,
     userAttemptsUsed: progress?.attemptsUsed ?? null,
-    userCompleted: progress ? Boolean(progress.solvedAt || progress.failedAt) : null,
+    userCompleted: progressState.userCompleted,
     userElapsedSeconds: currentElapsed,
     userStartedAt: progress?.startedAt ?? null,
-    userSolved: progress ? Boolean(progress.solvedAt) : null,
-    revealedAnswer:
-      isOwner || progress?.solvedAt || progress?.failedAt
-        ? clue.answer
-        : null,
+    userSolved: progressState.userSolved,
+    revealedAnswer: progressState.revealSolution ? clue.answer : null,
     isBlocked: Boolean(clue.blockedAt),
     reportCount: reportSummary ? Number(reportSummary.reportCount) : null,
     appealStatus: appeal?.status ?? null,
@@ -793,7 +793,7 @@ router.put("/clues/:slug/rating", requireAuth, async (req, res): Promise<void> =
     return;
   }
   const [solve] = await db
-    .select({ id: solverProgressTable.id })
+    .select({ solvedAt: solverProgressTable.solvedAt })
     .from(solverProgressTable)
     .where(
       and(
@@ -803,7 +803,7 @@ router.put("/clues/:slug/rating", requireAuth, async (req, res): Promise<void> =
       ),
     )
     .limit(1);
-  if (!solve) {
+  if (!hasSuccessfulSolve(solve)) {
     res.status(403).json({ error: "Solve this clue before rating it." });
     return;
   }
@@ -1043,16 +1043,11 @@ router.post(
         .limit(1);
       const terminal = Boolean(progress.solvedAt || progress.failedAt);
       if (terminal) {
-        return {
-          correct: Boolean(progress.solvedAt),
-          attemptsUsed: progress.attemptsUsed,
-          attemptsRemaining: 0,
-          completed: true,
-          elapsedSeconds: progress.elapsedSeconds ?? 0,
-          message: progress.solvedAt
-            ? "You already solved this clue."
-            : "No attempts remain for this clue.",
-        };
+        return getCompletedAttemptResult(
+          progress,
+          clue.maxAttempts,
+          progress.elapsedSeconds ?? 0,
+        );
       }
 
       const attemptsUsed = progress.attemptsUsed + 1;
@@ -1157,21 +1152,13 @@ router.post(
         progress.elapsedSeconds ??
         Math.max(0, Math.floor((now.getTime() - progress.startedAt.getTime()) / 1000));
       if (progress.solvedAt || progress.failedAt) {
-        const gaveUp = Boolean(progress.failedAt && progress.attemptsUsed < clue.maxAttempts);
         return {
           status: 200 as const,
-          result: {
-            correct: Boolean(progress.solvedAt),
-            attemptsUsed: progress.attemptsUsed,
-            attemptsRemaining: 0,
-            completed: true,
+          result: getCompletedAttemptResult(
+            progress,
+            clue.maxAttempts,
             elapsedSeconds,
-            message: progress.solvedAt
-              ? "You already solved this clue."
-              : gaveUp
-                ? "You gave up. The answer and wordplay are revealed."
-                : "No attempts remain for this clue.",
-          },
+          ),
         };
       }
 

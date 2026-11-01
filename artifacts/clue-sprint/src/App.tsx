@@ -30,6 +30,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
+import { getSavedAttemptResult } from '@/lib/saved-attempt-result';
 import NotFound from '@/pages/not-found';
 import TutorialPage from '@/pages/tutorial';
 import {
@@ -647,26 +648,7 @@ function ChallengePage() {
     const timer = window.setInterval(updateTimer, 1000);
     return () => window.clearInterval(timer);
   }, [startedAt, result?.completed, clue?.userCompleted, clue?.userElapsedSeconds]);
-  const savedResult = clue && (
-    clue.userCompleted || (clue.userAttemptsUsed !== null && clue.userAttemptsUsed > 0)
-  )
-    ? {
-        correct: Boolean(clue.userSolved),
-        attemptsUsed: clue.userAttemptsUsed ?? 0,
-        attemptsRemaining: clue.userCompleted
-          ? 0
-          : Math.max(0, clue.maxAttempts - (clue.userAttemptsUsed ?? 0)),
-        completed: Boolean(clue.userCompleted),
-        elapsedSeconds: clue.userElapsedSeconds ?? 0,
-        message: clue.userCompleted
-          ? clue.userSolved
-            ? 'You already solved this clue.'
-            : (clue.userAttemptsUsed ?? 0) < clue.maxAttempts
-              ? 'You gave up. The answer and wordplay are revealed.'
-              : 'No attempts remain for this clue.'
-          : 'Your progress is saved. Keep going.',
-      }
-    : null;
+  const savedResult = getSavedAttemptResult(clue);
   const visibleResult = result ?? savedResult;
   const copyChallengeLink = async () => {
     try {
