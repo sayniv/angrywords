@@ -6,6 +6,7 @@ import {
   decodeClueListingCursor,
   encodeClueListingCursor,
   getClueListingCursorCondition,
+  getClueListingPageCondition,
   getClueListingOrder,
   type ClueListingCursor,
 } from "../src/lib/clue-listing.ts";
@@ -84,6 +85,39 @@ test("rating cursors continue through equal-rating ties and the unrated tail", (
     fields,
   ));
   assert.ok(preciseCondition.params.includes(preciseTimestamp));
+});
+
+test("later clue pages keep excluding clues that are blocked or retired", () => {
+  const fields = {
+    averageRating: sql`"ratings"."average_rating"`,
+    ratingCount: sql`coalesce("ratings"."rating_count", 0)`,
+    createdAt: sql`"clues"."created_at"`,
+    id: sql`"clues"."id"`,
+  };
+  const pageCondition = dialect.sqlToQuery(getClueListingPageCondition(
+    sql`"clues"."retired_at"`,
+    sql`"clues"."blocked_at"`,
+    cursor,
+    fields,
+  ));
+
+  assert.match(pageCondition.sql, /"clues"\."retired_at" is null/i);
+  assert.match(pageCondition.sql, /"clues"\."blocked_at" is null/i);
+  assert.match(pageCondition.sql, /"ratings"\."average_rating" < \$/i);
+  assert.match(pageCondition.sql, /"clues"\."created_at" < \$/i);
+  assert.ok(pageCondition.params.includes(cursor.averageRating));
+  assert.ok(pageCondition.params.includes(cursor.createdAt));
+  assert.ok(pageCondition.params.includes(cursor.id));
+
+  const firstPageCondition = dialect.sqlToQuery(getClueListingPageCondition(
+    sql`"clues"."retired_at"`,
+    sql`"clues"."blocked_at"`,
+    null,
+    fields,
+  ));
+  assert.match(firstPageCondition.sql, /"clues"\."retired_at" is null/i);
+  assert.match(firstPageCondition.sql, /"clues"\."blocked_at" is null/i);
+  assert.doesNotMatch(firstPageCondition.sql, /"ratings"\."average_rating" < \$/i);
 });
 
 test("clue listing pages validate the items and provide an optional next cursor", () => {

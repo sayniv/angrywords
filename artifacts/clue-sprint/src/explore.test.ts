@@ -157,6 +157,31 @@ describe('Home and Explore destinations', () => {
     expect(fetchNextPage).toHaveBeenCalledOnce();
   });
 
+  it('uses the latest page cursor when requesting more playable clues', async () => {
+    setupClueQuery({ data: { pages: [{ items: [clue(2)], nextCursor: 'after-clue-2' }] }, hasNextPage: true });
+    api.listClues.mockResolvedValue({ items: [clue(1)], nextCursor: null });
+
+    renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));
+
+    const options = api.infiniteQuery.mock.calls[0]?.[0] as {
+      queryFn: (context: { pageParam: string | null; signal: AbortSignal }) => Promise<unknown>;
+      getNextPageParam: (page: { nextCursor: string | null }) => string | undefined;
+    };
+    const cursor = options.getNextPageParam({ nextCursor: 'after-clue-2' });
+    expect(cursor).toBe('after-clue-2');
+
+    const signal = new AbortController().signal;
+    await options.queryFn({ pageParam: cursor ?? null, signal });
+
+    expect(api.listClues).toHaveBeenCalledWith(
+      { sort: 'newest', cursor: 'after-clue-2' },
+      { signal },
+    );
+    expect(screen.getByTestId('list-playable-clues').children).toHaveLength(1);
+    expect(screen.getByTestId('card-clue-2')).toBeTruthy();
+    expect(screen.queryByTestId('card-clue-1')).toBeNull();
+  });
+
   it('preserves loading and empty catalog states', () => {
     setupClueQuery({ isLoading: true });
     const loadingView = renderWithRouter(createElement(ExplorePage, { sort: 'newest' }));

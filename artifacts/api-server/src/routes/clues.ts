@@ -85,9 +85,8 @@ import { getGuessFeedback } from "../lib/guess-feedback";
 import {
   decodeClueListingCursor,
   encodeClueListingCursor,
-  getClueListingCursorCondition,
+  getClueListingPageCondition,
   getClueListingOrder,
-  getPlayableClueFilter,
   serializePublicClueSummary,
 } from "../lib/clue-listing";
 
@@ -319,15 +318,6 @@ router.get("/clues", async (req, res): Promise<void> => {
     .groupBy(clueRatingsTable.clueId)
     .as("clue_rating_summary");
   const ratingCountForSort = sql`coalesce(${ratings.ratingCount}, 0)`;
-  const filters = [getPlayableClueFilter(cluesTable.retiredAt, cluesTable.blockedAt)];
-  if (cursor) {
-    filters.push(getClueListingCursorCondition(cursor, {
-      averageRating: ratings.averageRating,
-      ratingCount: ratingCountForSort,
-      createdAt: cluesTable.createdAt,
-      id: cluesTable.id,
-    }));
-  }
   const pageRows = await db
     .select({
       id: cluesTable.id,
@@ -345,7 +335,17 @@ router.get("/clues", async (req, res): Promise<void> => {
     })
     .from(cluesTable)
     .leftJoin(ratings, eq(ratings.clueId, cluesTable.id))
-    .where(and(...filters))
+    .where(getClueListingPageCondition(
+      cluesTable.retiredAt,
+      cluesTable.blockedAt,
+      cursor,
+      {
+        averageRating: ratings.averageRating,
+        ratingCount: ratingCountForSort,
+        createdAt: cluesTable.createdAt,
+        id: cluesTable.id,
+      },
+    ))
     .orderBy(...getClueListingOrder(sortByRating, {
       averageRating: ratings.averageRating,
       ratingCount: ratingCountForSort,

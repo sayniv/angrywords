@@ -4,6 +4,24 @@ export function getPlayableClueFilter(retiredAt: SQLWrapper, blockedAt: SQLWrapp
   return and(isNull(retiredAt), isNull(blockedAt));
 }
 
+export function getClueListingPageCondition(
+  retiredAt: SQLWrapper,
+  blockedAt: SQLWrapper,
+  cursor: ClueListingCursor | null,
+  fields: {
+    averageRating: SQLWrapper;
+    ratingCount: SQLWrapper;
+    createdAt: SQLWrapper;
+    id: SQLWrapper;
+  },
+) {
+  const conditions = [getPlayableClueFilter(retiredAt, blockedAt)];
+  if (cursor) {
+    conditions.push(getClueListingCursorCondition(cursor, fields));
+  }
+  return and(...conditions);
+}
+
 export function getClueListingOrder(
   sortByRating: boolean,
   fields: {
