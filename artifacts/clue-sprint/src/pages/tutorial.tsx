@@ -175,8 +175,8 @@ export default function TutorialPage() {
                   <button className="tutorial-text-action" type="button" onClick={() => setHintOpen((open) => !open)} aria-expanded={hintOpen} data-testid="button-toggle-hint">
                     <Lightbulb size={16} /> {hintOpen ? 'Hide hint' : 'Give me a hint'}
                   </button>
-                  <button className="button button-primary tutorial-reveal-action" type="button" onClick={revealAnswer} aria-expanded={answerOpen} data-testid="button-reveal-answer">
-                    <Eye size={15} /> {answerOpen ? 'Answer revealed' : 'Reveal answer'}
+                  <button className="button tutorial-reveal-action" type="button" onClick={revealAnswer} aria-expanded={answerOpen} data-testid="button-reveal-answer">
+                    <Eye size={14} /> {answerOpen ? 'Answer revealed' : 'Reveal answer'}
                   </button>
                 </div>
                 {hintOpen && <div className="tutorial-hint" role="note"><Lightbulb size={16} /><p><strong>A small nudge</strong>{example.hint}</p></div>}
