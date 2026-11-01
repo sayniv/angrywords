@@ -313,6 +313,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClueRetired"
+  /clues/{slug}/give-up:
+    post:
+      operationId: giveUpClue
+      tags: [clues]
+      summary: Give up on an active clue
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Run ended and solution revealed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttemptResult"
+        "401":
+          description: Sign in to give up on a clue
+        "403":
+          description: Setters cannot compete on their own clue
+        "404":
+          description: Clue not found
+        "409":
+          description: Start the clue before giving up
+        "410":
+          description: Clue has been retired or blocked after community reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /me/dashboard:
     get:
       operationId: getMyDashboard

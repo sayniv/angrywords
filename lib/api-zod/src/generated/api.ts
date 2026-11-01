@@ -247,6 +247,23 @@ export const StartClueResponse = zod.object({
 
 
 /**
+ * @summary Give up on an active clue
+ */
+export const GiveUpClueParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const GiveUpClueResponse = zod.object({
+  "correct": zod.boolean(),
+  "attemptsUsed": zod.number().int(),
+  "attemptsRemaining": zod.number().int(),
+  "completed": zod.boolean(),
+  "elapsedSeconds": zod.number().int(),
+  "message": zod.string().optional()
+})
+
+
+/**
  * @summary Get current user's clue and solve activity
  */
 export const GetMyDashboardResponse = zod.object({

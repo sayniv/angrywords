@@ -14,7 +14,7 @@ import {
   getGetClueLeaderboardQueryKey, getGetClueQueryKey, getGetMyDashboardQueryKey,
   getGetMyProfileQueryKey, getGetSetterLeaderboardQueryKey, getGetSolverLeaderboardQueryKey,
   getListCluesQueryKey, useCreateClue, useGetClue, useGetClueLeaderboard,
-  useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard,
+  useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
   useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
   type SolverActivity,
 } from '@workspace/api-client-react';
@@ -568,6 +568,7 @@ function ChallengePage() {
   const { data: leaderboard, isLoading: leaderboardLoading, isError: leaderboardError, refetch: refetchLeaderboard } =
     useGetClueLeaderboard(slug, { query: { queryKey: getGetClueLeaderboardQueryKey(slug), staleTime: 15_000, refetchOnMount: 'always' } });
   const submitAttempt = useSubmitAttempt();
+  const giveUpClue = useGiveUpClue();
   const startClue = useStartClue();
   const cache = useQueryClient();
   const { isLoaded: authLoaded, isSignedIn } = useUser();
@@ -582,6 +583,7 @@ function ChallengePage() {
   const [ratingError, setRatingError] = useState('');
   const [reportNotice, setReportNotice] = useState('');
   const [reportError, setReportError] = useState('');
+  const [giveUpError, setGiveUpError] = useState('');
   const [localElapsed, setLocalElapsed] = useState(0);
   const startRequested = useRef(false);
   useEffect(() => {
@@ -592,6 +594,7 @@ function ChallengePage() {
     setRatingError('');
     setReportNotice('');
     setReportError('');
+    setGiveUpError('');
     startRequested.current = false;
   }, [slug]);
   useEffect(() => {
@@ -616,15 +619,23 @@ function ChallengePage() {
     const timer = window.setInterval(updateTimer, 1000);
     return () => window.clearInterval(timer);
   }, [startedAt, result?.completed, clue?.userCompleted, clue?.userElapsedSeconds]);
-  const savedResult = clue && clue.userAttemptsUsed !== null && clue.userAttemptsUsed > 0
+  const savedResult = clue && (
+    clue.userCompleted || (clue.userAttemptsUsed !== null && clue.userAttemptsUsed > 0)
+  )
     ? {
         correct: Boolean(clue.userSolved),
-        attemptsUsed: clue.userAttemptsUsed,
-        attemptsRemaining: Math.max(0, clue.maxAttempts - clue.userAttemptsUsed),
+        attemptsUsed: clue.userAttemptsUsed ?? 0,
+        attemptsRemaining: clue.userCompleted
+          ? 0
+          : Math.max(0, clue.maxAttempts - (clue.userAttemptsUsed ?? 0)),
         completed: Boolean(clue.userCompleted),
         elapsedSeconds: clue.userElapsedSeconds ?? 0,
         message: clue.userCompleted
-          ? clue.userSolved ? 'You already solved this clue.' : 'No attempts remain for this clue.'
+          ? clue.userSolved
+            ? 'You already solved this clue.'
+            : (clue.userAttemptsUsed ?? 0) < clue.maxAttempts
+              ? 'You gave up. The answer and wordplay are revealed.'
+              : 'No attempts remain for this clue.'
           : 'Your progress is saved. Keep going.',
       }
     : null;
@@ -680,6 +691,27 @@ function ChallengePage() {
         return;
       }
       setResult({ correct: false, attemptsUsed: result?.attemptsUsed || 0, attemptsRemaining: result?.attemptsRemaining ?? clue.maxAttempts, completed: false, elapsedSeconds: 0, message: apiErrorMessage(cause, 'Your guess could not be sent. Please try again.') });
+    }
+  };
+  const handleGiveUp = async () => {
+    if (!clue || visibleResult?.completed || giveUpClue.isPending) return;
+    if (!window.confirm('Give up on this clue? This ends your run and reveals the answer and wordplay.')) return;
+    setGiveUpError('');
+    try {
+      const next = await giveUpClue.mutateAsync({ slug });
+      setResult(next);
+      setAnswer('');
+      await Promise.all([
+        cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getGetClueLeaderboardQueryKey(slug) }),
+        cache.invalidateQueries({ queryKey: getGetMyDashboardQueryKey() }),
+      ]);
+    } catch (cause) {
+      if (hasHttpStatus(cause, 410)) {
+        await cache.invalidateQueries({ queryKey: getGetClueQueryKey(slug) });
+        return;
+      }
+      setGiveUpError(apiErrorMessage(cause, 'You could not give up on this clue. Please try again.'));
     }
   };
   const submitRating = async (rating: number) => {
@@ -777,6 +809,12 @@ function ChallengePage() {
               <div className="guess-entry"><input data-testid="input-guess" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Type your guess…" autoComplete="off" aria-label="Your answer guess" /><button className="button button-primary" type="submit" data-testid="button-submit-guess" disabled={submitAttempt.isPending || !answer.trim()}>Guess it <ArrowRight size={16} /></button></div>
               <div className="guess-bottom"><div className="attempt-dots">{Array.from({ length: clue.maxAttempts }, (_, i) => <i className={i < (visibleResult?.attemptsUsed || 0) ? 'attempt-used' : ''} key={i} />)}</div><span>{visibleResult ? `${visibleResult.attemptsRemaining} ${visibleResult.attemptsRemaining === 1 ? 'guess' : 'guesses'} left` : `${clue.maxAttempts} guesses to crack it`}</span></div>
               {visibleResult && <div className={`attempt-result ${visibleResult.correct ? 'result-correct' : 'result-wrong'}`} role="status"><span>{visibleResult.correct ? <Check size={17} /> : <X size={17} />}</span><div><strong>{visibleResult.message || (visibleResult.correct ? 'That’s the one!' : 'Not quite. Keep turning it over.')}</strong>{visibleResult.correct && <p>You got it in {formatTime(visibleResult.elapsedSeconds)}. Your time is on the board.</p>}</div></div>}
+              <div className="give-up-row">
+                <button className="button button-danger-outline" type="button" data-testid="button-give-up" onClick={() => void handleGiveUp()} disabled={giveUpClue.isPending || !persistedStart}>
+                  {giveUpClue.isPending ? 'Revealing…' : 'Give up'}
+                </button>
+              </div>
+              {giveUpError && <div className="form-error" role="alert" data-testid="status-give-up-error">{giveUpError}</div>}
             </form>
           )}
         </section>

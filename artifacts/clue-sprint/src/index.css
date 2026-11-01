@@ -571,6 +571,7 @@
 .guess-entry input { font-size: 14px; }
 .guess-entry .button { flex: 0 0 auto; }
 .guess-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: #897b6d; font: 10px var(--app-font-mono); }
+.give-up-row { display: flex; justify-content: flex-end; margin-top: 14px; }
 .attempt-dots { display: flex; gap: 5px; }
 .attempt-dots i { display: block; width: 15px; height: 4px; background: #c9bca9; border-radius: 5px; }
 .attempt-dots i.attempt-used { background: var(--tomato); }

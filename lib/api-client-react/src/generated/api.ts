@@ -1025,6 +1025,80 @@ export const useStartClue = <TError = ErrorType<void | ClueRetired>,
       return useMutation(getStartClueMutationOptions(options));
     }
 
+export const getGiveUpClueUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}/give-up`
+}
+
+/**
+ * @summary Give up on an active clue
+ */
+export const giveUpClue = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<AttemptResult> => {
+
+  return customFetch<AttemptResult>(getGiveUpClueUrl(slug),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getGiveUpClueMutationKey = () => ['giveUpClue'] as const;
+
+export const getGiveUpClueMutationOptions = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof giveUpClue>>, TError,GiveUpClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof giveUpClue>>, TError,GiveUpClueMutationVariables, TContext> => {
+
+const mutationKey = getGiveUpClueMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof giveUpClue>>, GiveUpClueMutationVariables> = (props) => {
+          const {slug} = props ?? {};
+
+          return  giveUpClue(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GiveUpClueMutationResult = NonNullable<Awaited<ReturnType<typeof giveUpClue>>>
+
+    export type GiveUpClueMutationError = ErrorType<void | ClueRetired>
+    export type GiveUpClueMutationVariables = {slug: string}
+
+    /**
+ * @summary Give up on an active clue
+ */
+export const useGiveUpClue = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof giveUpClue>>, TError,GiveUpClueMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof giveUpClue>>,
+        TError,
+        GiveUpClueMutationVariables,
+        TContext
+      > => {
+      return useMutation(getGiveUpClueMutationOptions(options));
+    }
+
 export const getGetMyDashboardUrl = () => {
 
 

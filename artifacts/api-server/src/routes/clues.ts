@@ -864,6 +864,120 @@ router.post(
   },
 );
 
+router.post(
+  "/clues/:slug/give-up",
+  requireAuth,
+  async (req, res): Promise<void> => {
+    const params = SubmitAttemptParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+
+    const [clue] = await db
+      .select()
+      .from(cluesTable)
+      .where(eq(cluesTable.slug, params.data.slug))
+      .limit(1);
+    if (!clue) {
+      res.status(404).json({ error: "Clue not found." });
+      return;
+    }
+    if (clue.retiredAt) {
+      res.status(410).json({ error: "This clue has been retired by its setter." });
+      return;
+    }
+    if (clue.blockedAt) {
+      res.status(410).json({
+        error: "This clue has been blocked after reaching 100 community reports.",
+      });
+      return;
+    }
+
+    const userId = getAuth(req).userId!;
+    if (userId === clue.setterUserId) {
+      res.status(403).json({ error: "Setters cannot compete on their own clue." });
+      return;
+    }
+    const profile = await ensureProfile(userId);
+    if (!profile.onboardingComplete) {
+      res.status(409).json({ error: "Choose a public ID before giving up on a clue." });
+      return;
+    }
+
+    const now = new Date();
+    const result = await db.transaction(async (tx) => {
+      const [progress] = await tx
+        .select()
+        .from(solverProgressTable)
+        .where(
+          and(
+            eq(solverProgressTable.clueId, clue.id),
+            eq(solverProgressTable.userId, userId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+
+      if (!progress) {
+        return {
+          status: 409 as const,
+          error: "Start the clue before giving up.",
+        };
+      }
+
+      const elapsedSeconds =
+        progress.elapsedSeconds ??
+        Math.max(0, Math.floor((now.getTime() - progress.startedAt.getTime()) / 1000));
+      if (progress.solvedAt || progress.failedAt) {
+        const gaveUp = Boolean(progress.failedAt && progress.attemptsUsed < clue.maxAttempts);
+        return {
+          status: 200 as const,
+          result: {
+            correct: Boolean(progress.solvedAt),
+            attemptsUsed: progress.attemptsUsed,
+            attemptsRemaining: 0,
+            completed: true,
+            elapsedSeconds,
+            message: progress.solvedAt
+              ? "You already solved this clue."
+              : gaveUp
+                ? "You gave up. The answer and wordplay are revealed."
+                : "No attempts remain for this clue.",
+          },
+        };
+      }
+
+      await tx
+        .update(solverProgressTable)
+        .set({
+          failedAt: now,
+          elapsedSeconds,
+          displayName: profile.publicId,
+        })
+        .where(eq(solverProgressTable.id, progress.id));
+
+      return {
+        status: 200 as const,
+        result: {
+          correct: false,
+          attemptsUsed: progress.attemptsUsed,
+          attemptsRemaining: 0,
+          completed: true,
+          elapsedSeconds,
+          message: "You gave up. The answer and wordplay are revealed.",
+        },
+      };
+    });
+
+    if (result.status === 409) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    res.json(SubmitAttemptResponse.parse(result.result));
+  },
+);
+
 router.get("/leaderboards/solvers", async (_req, res): Promise<void> => {
   const averageTime = avg(solverProgressTable.elapsedSeconds);
   const rows = await db
