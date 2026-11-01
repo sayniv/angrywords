@@ -571,6 +571,44 @@ describe('Race So Far medal tiers', () => {
     }
   });
 
+  it('keeps tier labels, winner badges, ranks, and solve times readable on narrow phones', () => {
+    const tiers = [
+      { tier: 'gold', category: 'gold', description: 'Fastest solve, no hints' },
+      { tier: 'silver', category: 'hints-no-assist', description: 'Solved with hints' },
+      { tier: 'bronze', category: 'assist', description: 'Solved with assist mode' },
+    ] as const;
+    const view = render(createElement('div', null, ...tiers.map(({ tier, category, description }) => createElement(ClueLeaderboardSection, {
+      key: tier,
+      tier,
+      description,
+      category,
+      entries: [
+        { rank: 1, displayName: 'First solver', elapsedSeconds: 63, attemptsUsed: 1, solvedAt: '2026-11-01T12:00:00Z' },
+        { rank: 2, displayName: 'Second solver', elapsedSeconds: 81, attemptsUsed: 2, solvedAt: '2026-11-01T12:01:00Z' },
+      ],
+      loading: false,
+      failed: false,
+      retry: vi.fn(),
+    }))));
+
+    for (const { tier, category, description } of tiers) {
+      const section = screen.getByTestId(`section-leaderboard-${category}`);
+      expect(section.querySelector('h3')?.textContent).toBe(tier[0].toUpperCase() + tier.slice(1));
+      expect(section.querySelector('.clue-board-title > span')?.textContent).toBe(description);
+      expect(section.querySelector('[aria-label="1st place"] svg')).toBeTruthy();
+      expect(screen.getByTestId(`row-leader-${category}-2`).querySelector('.rank-badge')?.textContent).toBe('02');
+      expect(section.querySelector('.leader-time')?.textContent).toBe('1:03');
+    }
+
+    const css = readFileSync(path.resolve(process.cwd(), 'src/index.css'), 'utf8');
+    const phoneRules = css.match(/@media \(max-width: 600px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    expect(phoneRules).toContain('.clue-board-title { align-items: flex-start; flex-direction: column;');
+    expect(phoneRules).toContain('.clue-board-title > span { font-size: 10px; text-align: left; }');
+    expect(phoneRules).toContain('.tier-rank-badge { width: 30px; height: 30px; }');
+    expect(phoneRules).toContain('.leader-time { flex: 0 0 auto; font-size: 12px; white-space: nowrap; }');
+    view.unmount();
+  });
+
   it('preserves loading, empty, error, and retry states', async () => {
     const loading = renderClueLeaderboard('gold', 'gold', { entries: undefined, loading: true });
     expect(loading.container.querySelector('.leader-skeleton')).toBeTruthy();

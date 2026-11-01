@@ -867,6 +867,12 @@
   .attempt-dots { gap: 3px; }
   .attempt-dots i { width: 11px; }
   .challenge-aside { padding: 18px; }
+  .clue-board-title { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .clue-board-title > span { font-size: 10px; text-align: left; }
+  .leader-row { gap: 8px; }
+  .leader-person { flex: 1 1 auto; }
+  .tier-rank-badge { width: 30px; height: 30px; }
+  .leader-time { flex: 0 0 auto; font-size: 12px; white-space: nowrap; }
   .dashboard-page { padding-top: 37px; padding-bottom: 65px; }
   .dash-welcome { align-items: flex-start; flex-direction: column; margin-bottom: 25px; }
   .dash-welcome .button { width: 100%; }
