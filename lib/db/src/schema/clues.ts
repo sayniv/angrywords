@@ -9,6 +9,7 @@ export const cluesTable = pgTable("clues", {
   answer: text("answer").notNull(),
   normalizedAnswer: text("normalized_answer").notNull(),
   wordplay: text("wordplay"),
+  hints: text("hints").array().notNull().default([]),
   maxAttempts: integer("max_attempts").notNull(),
   setterUserId: text("setter_user_id").notNull(),
   setterName: varchar("setter_name", { length: 48 }).notNull(),

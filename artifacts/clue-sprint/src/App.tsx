@@ -20,7 +20,7 @@ import {
   getListCluesQueryKey, useCreateClue, useDeleteMyAccount, useGetClue, useGetClueLeaderboard, useGetCluePublishQuota,
   useListPendingClueAppeals, useReviewClueAppeal, useSubmitClueAppeal,
   useGetMyDashboard, useGetMyProfile, useGetSetterLeaderboard, useGetSolverLeaderboard, useGiveUpClue,
-  useListClues, useRateClue, useReportClue, useRetireClue, useStartClue, useSubmitAttempt, useUpdateMyProfile,
+  useListClues, useRateClue, useReportClue, useRetireClue, useRevealClueHint, useStartClue, useSubmitAttempt, useUpdateMyProfile,
   type SolverActivity,
 } from '@workspace/api-client-react';
 import {
@@ -36,6 +36,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import { getSavedAttemptResult } from '@/lib/saved-attempt-result';
+import { confirmHintReveal } from '@/lib/hint-confirmation';
 import NotFound from '@/pages/not-found';
 import TutorialPage from '@/pages/tutorial';
 import {
@@ -536,6 +537,7 @@ function CreatePage() {
   const [clue, setClue] = useState('');
   const [answer, setAnswer] = useState('');
   const [wordplay, setWordplay] = useState('');
+  const [hints, setHints] = useState<string[]>([]);
   const [maxAttempts, setMaxAttempts] = useState(5);
   const [error, setError] = useState('');
   const [review, setReview] = useState(false);
@@ -569,6 +571,10 @@ function CreatePage() {
     if (clue.trim().length < 4) { setError('A clue needs at least four characters.'); return false; }
     if (!normalizedAnswer) { setError('Add the answer so the sprint can check guesses.'); return false; }
     if (!wordplay.trim()) { setError('Add a short explanation so solvers can enjoy the reveal.'); return false; }
+    if (hints.length > 3 || hints.some((hint) => !hint.trim() || hint.trim().length > 300)) {
+      setError('Each hint must contain 1–300 characters. Remove any empty hint; you can add up to three.');
+      return false;
+    }
     return true;
   };
   const submitDraft = (event: FormEvent<HTMLFormElement>) => {
@@ -581,6 +587,7 @@ function CreatePage() {
       const created = await createClue.mutateAsync({ data: {
         clue: clue.trim(), answer: normalizedAnswer.toUpperCase(),
         wordplay: wordplay.trim(), maxAttempts,
+        hints: hints.map((hint) => hint.trim()),
       } });
       trackEvent('clue_published', {
         max_attempts: maxAttempts,
@@ -620,6 +627,23 @@ function CreatePage() {
 
         <div className="form-divider" />
         <div className="attempt-control"><div><span className="form-index">03 / GIVE THEM A FEW SHOTS</span><h2>Maximum attempts</h2><p>How many guesses before the answer is revealed?</p></div><div className="attempt-stepper"><button type="button" aria-label="Fewer attempts" onClick={() => setMaxAttempts(Math.max(1, maxAttempts - 1))}><span>−</span></button><strong data-testid="text-max-attempts">{maxAttempts}</strong><button type="button" aria-label="More attempts" onClick={() => setMaxAttempts(Math.min(10, maxAttempts + 1))}><span>+</span></button></div></div>
+        <div className="form-divider" />
+        <div className="form-heading"><span className="form-index">04 / OPTIONAL HELP</span><h2>Add up to three hints.</h2></div>
+        <p className="hint-authoring-note">Solvers reveal hints in order. Each one adds one minute to their recorded time.</p>
+        {hints.map((hint, index) => <div className="hint-input-row" key={index}>
+          <label className="field-label" htmlFor={`clue-hint-${index}`}>Hint {index + 1}</label>
+          <textarea
+            id={`clue-hint-${index}`}
+            data-testid={`input-hint-${index + 1}`}
+            value={hint}
+            onChange={(event) => setHints((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.value : value))}
+            placeholder={`A gentle nudge for solvers`}
+            maxLength={300}
+            rows={2}
+          />
+          <div className="field-hint"><span>{hint.length}/300 characters</span><button type="button" className="text-button" aria-label={`Remove hint ${index + 1}`} onClick={() => setHints((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button></div>
+        </div>)}
+        {hints.length < 3 && <button type="button" className="button button-outline add-hint-button" data-testid="button-add-hint" onClick={() => setHints((current) => [...current, ''])}><Lightbulb size={15} /> Add a hint {hints.length ? `(${hints.length}/3)` : ''}</button>}
         {error && <div className="form-error" role="alert"><X size={16} />{error}</div>}
         <button className="button button-primary publish-button" type="submit" data-testid="button-review-clue">
           Review your clue <ArrowRight size={17} />
@@ -634,6 +658,7 @@ function CreatePage() {
           <div><dt>Answer</dt><dd data-testid="review-answer">{normalizedAnswer.toUpperCase()}</dd></div>
           <div><dt>Setter's wordplay note</dt><dd data-testid="review-wordplay">{wordplay.trim()}</dd></div>
           <div><dt>Attempt limit</dt><dd data-testid="review-attempt-limit">{maxAttempts} {maxAttempts === 1 ? 'guess' : 'guesses'}</dd></div>
+          {hints.length ? hints.map((hint, index) => <div key={index}><dt>Hint {index + 1}</dt><dd data-testid={`review-hint-${index + 1}`}>{hint.trim()}</dd></div>) : <div><dt>Hints</dt><dd data-testid="review-hints-empty">No hints added</dd></div>}
         </dl>
         <div className="publish-warning" role="note"><LockKeyhole size={17} /><p><strong>Published clues cannot be edited.</strong><br />You can retire a clue later, but its wording and answer will stay as published.</p></div>
         {error && <div className="form-error" role="alert" data-testid="status-publish-error"><X size={16} />{error}</div>}
@@ -663,6 +688,7 @@ function ChallengePage() {
     useGetClueLeaderboard(slug, { query: { queryKey: getGetClueLeaderboardQueryKey(slug), staleTime: 15_000, refetchOnMount: 'always' } });
   const submitAttempt = useSubmitAttempt();
   const giveUpClue = useGiveUpClue();
+  const revealClueHint = useRevealClueHint();
   const startClue = useStartClue();
   const cache = useQueryClient();
   const [answer, setAnswer] = useState('');
@@ -684,6 +710,8 @@ function ChallengePage() {
   const [reportNotice, setReportNotice] = useState('');
   const [reportError, setReportError] = useState('');
   const [giveUpError, setGiveUpError] = useState('');
+  const [hintError, setHintError] = useState('');
+  const [revealedHints, setRevealedHints] = useState<string[]>([]);
   const [localElapsed, setLocalElapsed] = useState(0);
   const startRequested = useRef(false);
   useEffect(() => {
@@ -695,8 +723,13 @@ function ChallengePage() {
     setReportNotice('');
     setReportError('');
     setGiveUpError('');
+    setHintError('');
+    setRevealedHints([]);
     startRequested.current = false;
   }, [slug]);
+  useEffect(() => {
+    setRevealedHints(clue?.userRevealedHints ?? []);
+  }, [slug, clue?.userRevealedHints]);
   useEffect(() => {
     if (!authLoaded || !isSignedIn || !clue || clue.isOwner || clue.userCompleted || startRequested.current) return;
     startRequested.current = true;
@@ -714,11 +747,11 @@ function ChallengePage() {
       setLocalElapsed(clue?.userElapsedSeconds ?? 0);
       return;
     }
-    const updateTimer = () => setLocalElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    const updateTimer = () => setLocalElapsed(Math.floor((Date.now() - startedAt) / 1000) + revealedHints.length * 60);
     updateTimer();
     const timer = window.setInterval(updateTimer, 1000);
     return () => window.clearInterval(timer);
-  }, [startedAt, result?.completed, clue?.userCompleted, clue?.userElapsedSeconds]);
+  }, [startedAt, result?.completed, clue?.userCompleted, clue?.userElapsedSeconds, revealedHints.length]);
   const savedResult = getSavedAttemptResult(clue);
   const visibleResult = result ?? savedResult;
   const copyChallengeLink = async () => {
@@ -793,6 +826,25 @@ function ChallengePage() {
         return;
       }
       setGiveUpError(apiErrorMessage(cause, 'You could not give up on this clue. Please try again.'));
+    }
+  };
+  const handleRevealHint = async () => {
+    if (!clue || visibleResult?.completed || revealedHints.length >= clue.hintCount || revealClueHint.isPending) return;
+    setHintError('');
+    try {
+      const next = await confirmHintReveal(
+        () => window.confirm(`Reveal hint ${revealedHints.length + 1}? This adds 1 minute to your recorded solve time. Continue?`),
+        () => revealClueHint.mutateAsync({ slug }),
+      );
+      if (!next) return;
+      setRevealedHints((current) => [...current, next.hint]);
+      await cache.invalidateQueries({ queryKey: clueQueryKey });
+    } catch (cause) {
+      if (hasHttpStatus(cause, 410)) {
+        await cache.invalidateQueries({ queryKey: clueQueryKey });
+        return;
+      }
+      setHintError(apiErrorMessage(cause, 'The hint could not be revealed. Please try again.'));
     }
   };
   const submitRating = async (rating: number) => {
@@ -920,6 +972,16 @@ function ChallengePage() {
               <div className="guess-top"><div><span className="form-index">YOUR TURN</span><h2>What's your answer?</h2></div><div className="timer-chip"><Clock3 size={14} /> {formatTime(localElapsed)}</div></div>
               <div className="guess-entry"><input data-testid="input-guess" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Type your guess…" autoComplete="off" aria-label="Your answer guess" /><button className="button button-primary" type="submit" data-testid="button-submit-guess" disabled={submitAttempt.isPending || !answer.trim()}>Guess it <ArrowRight size={16} /></button></div>
               <div className="guess-bottom"><div className="attempt-dots">{Array.from({ length: clue.maxAttempts }, (_, i) => <i className={i < (visibleResult?.attemptsUsed || 0) ? 'attempt-used' : ''} key={i} />)}</div><span>{visibleResult ? `${visibleResult.attemptsRemaining} ${visibleResult.attemptsRemaining === 1 ? 'guess' : 'guesses'} left` : `${clue.maxAttempts} guesses to crack it`}</span></div>
+              {revealedHints.length > 0 && <ol className="revealed-hints" data-testid="list-revealed-hints">
+                {revealedHints.map((hint, index) => <li key={`${index}-${hint}`}><span>HINT {index + 1}</span><p>{hint}</p></li>)}
+              </ol>}
+              {clue.hintCount > revealedHints.length && <div className="hint-reveal">
+                <div><strong>Need a nudge?</strong><p>Each hint adds one minute to your recorded solve time.</p></div>
+                <button className="button button-outline" type="button" data-testid="button-reveal-hint" onClick={() => void handleRevealHint()} disabled={revealClueHint.isPending}>
+                  {revealClueHint.isPending ? 'Revealing…' : `Reveal hint ${revealedHints.length + 1} · +1:00`}
+                </button>
+              </div>}
+              {hintError && <div className="form-error" role="alert" data-testid="status-hint-error">{hintError}</div>}
               {visibleResult && <div className={`attempt-result ${visibleResult.correct ? 'result-correct' : 'result-wrong'}`} role="status"><span>{visibleResult.correct ? <Check size={17} /> : <X size={17} />}</span><div><strong>{visibleResult.message || (visibleResult.correct ? 'That’s the one!' : 'Not quite. Keep turning it over.')}</strong>{visibleResult.correct && <p>You got it in {formatTime(visibleResult.elapsedSeconds)}. Your time is on the board.</p>}</div></div>}
               <div className="give-up-row">
                 <button className="button button-danger-outline" type="button" data-testid="button-give-up" onClick={() => void handleGiveUp()} disabled={giveUpClue.isPending || !persistedStart}>

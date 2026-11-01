@@ -14,6 +14,16 @@ import {
   getSolverProgressScope,
   serializeSolverActivity,
 } from "../src/lib/solver-activity.ts";
+import {
+  CLUE_HINT_PENALTY_SECONDS,
+  getNextClueHint,
+  getPreviouslyRevealedHints,
+  getSolveElapsedSeconds,
+  isActiveSolve,
+  normalizeClueHints,
+} from "../src/lib/clue-hints.ts";
+import { CreateClueBody } from "@workspace/api-zod";
+import { confirmHintReveal } from "../../clue-sprint/src/lib/hint-confirmation.ts";
 
 const postgresDialect = new PgDialect();
 const solution = {
@@ -116,6 +126,7 @@ test("activity serialization preserves older-run attempt counts and result state
     failedAt: null,
     elapsedSeconds: 120,
     startedAt,
+    hintsRevealed: 0,
   });
   assert.equal(solvedActivity.attemptsUsed, 4);
   assert.equal(solvedActivity.attemptsRemaining, 2);
@@ -129,11 +140,22 @@ test("activity serialization preserves older-run attempt counts and result state
     failedAt: new Date("2026-10-15T12:05:00.000Z"),
     elapsedSeconds: 300,
     startedAt,
+    hintsRevealed: 0,
   });
   assert.equal(failedActivity.attemptsUsed, 6);
   assert.equal(failedActivity.attemptsRemaining, 0);
   assert.equal(failedActivity.state, "failed");
   assert.equal(failedActivity.elapsedSeconds, 300);
+
+  const activeWithHints = serializeSolverActivity(clue, {
+    attemptsUsed: 1,
+    solvedAt: null,
+    failedAt: null,
+    elapsedSeconds: null,
+    startedAt: new Date(Date.now() - 10_000),
+    hintsRevealed: 2,
+  });
+  assert.ok(activeWithHints.elapsedSeconds >= 2 * CLUE_HINT_PENALTY_SECONDS);
 });
 
 test("a reloaded clue restores saved attempts and its in-progress result", () => {
@@ -247,4 +269,67 @@ test("a later guess cannot change a surrendered run or make it rateable", () => 
   });
   assert.equal(progress.attemptsUsed, 0);
   assert.equal(hasSuccessfulSolve(progress), false);
+});
+
+test("hint authoring accepts zero to three trimmed hints and rejects blanks or excess entries", () => {
+  assert.deepEqual(normalizeClueHints(undefined), { valid: true, hints: [] });
+  assert.deepEqual(normalizeClueHints(["  first hint ", "second"]), {
+    valid: true,
+    hints: ["first hint", "second"],
+  });
+  assert.equal(normalizeClueHints(["one", " ", "three"]).valid, false);
+  assert.equal(normalizeClueHints(["a", "b", "c", "d"]).valid, false);
+  assert.equal(normalizeClueHints(["x".repeat(301)]).valid, false);
+
+  const input = {
+    clue: "A clue",
+    answer: "WORD",
+    wordplay: "An explanation",
+    maxAttempts: 5,
+  };
+  assert.equal(CreateClueBody.safeParse({ ...input, hints: ["one", "two", "three"] }).success, true);
+  assert.equal(CreateClueBody.safeParse({ ...input, hints: ["one", "two", "three", "four"] }).success, false);
+  assert.equal(CreateClueBody.safeParse({ ...input, hints: [""] }).success, false);
+});
+
+test("hint reveal returns hints in order and reload state contains only previously revealed hints", () => {
+  const hints = ["Look at the first word.", "Try splitting the answer.", "Check the ending."];
+  assert.equal(getNextClueHint(hints, 0), hints[0]);
+  assert.equal(getNextClueHint(hints, 1), hints[1]);
+  assert.equal(getNextClueHint(hints, 3), null);
+
+  // The persisted reveal count is enough to restore prior use without exposing later hints.
+  const persistedRevealCount = 2;
+  assert.deepEqual(getPreviouslyRevealedHints(hints, persistedRevealCount), hints.slice(0, 2));
+  assert.deepEqual(getPreviouslyRevealedHints(hints, 0), []);
+  assert.equal(isActiveSolve(undefined), false);
+  assert.equal(isActiveSolve({ solvedAt: new Date(), failedAt: null }), false);
+  assert.equal(isActiveSolve({ solvedAt: null, failedAt: new Date() }), false);
+  assert.equal(isActiveSolve({ solvedAt: null, failedAt: null }), true);
+});
+
+test("each revealed hint adds one minute to live and completed solve time", () => {
+  const start = new Date("2026-11-01T12:00:00.000Z");
+  const now = start.getTime() + 75_500;
+  assert.equal(getSolveElapsedSeconds(start, 0, now), 75);
+  assert.equal(getSolveElapsedSeconds(start, 1, now), 75 + CLUE_HINT_PENALTY_SECONDS);
+  assert.equal(getSolveElapsedSeconds(start, 2, now), 75 + 2 * CLUE_HINT_PENALTY_SECONDS);
+  assert.equal(getSolveElapsedSeconds(new Date(now + 1000), 1, now), CLUE_HINT_PENALTY_SECONDS);
+});
+
+test("cancelling the hint confirmation calls no reveal action; confirming calls it once", async () => {
+  let reveals = 0;
+  const cancelled = await confirmHintReveal(
+    () => false,
+    async () => { reveals += 1; return "secret"; },
+  );
+  assert.equal(cancelled, undefined);
+  assert.equal(reveals, 0);
+
+  const confirmed = await confirmHintReveal(
+    () => true,
+    async () => { reveals += 1; return "secret"; },
+  );
+  assert.equal(confirmed, "secret");
+  assert.equal(reveals, 1);
 });

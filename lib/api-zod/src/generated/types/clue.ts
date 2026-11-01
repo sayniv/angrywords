@@ -38,6 +38,12 @@ export interface Clue {
   userSolved: boolean | null;
   /** @nullable */
   revealedAnswer: string | null;
+  userRevealedHints: string[];
+  /**
+     * @minimum 0
+     * @maximum 3
+     */
+  hintCount: number;
   isBlocked?: boolean;
   /** @nullable */
   reportCount?: number | null;

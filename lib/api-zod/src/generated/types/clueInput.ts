@@ -27,4 +27,10 @@ export interface ClueInput {
      * @maximum 10
      */
   maxAttempts: number;
+  /**
+     * @maxItems 3
+     * @items.minLength 1
+     * @items.maxLength 300
+     */
+  hints?: string[];
 }

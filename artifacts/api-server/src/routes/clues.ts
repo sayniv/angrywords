@@ -39,6 +39,7 @@ import {
   UpdateMyProfileResponse,
   GetMyActivityQueryParams,
   GetMyActivityResponse,
+  RevealClueHintResponse,
 } from "@workspace/api-zod";
 import {
   db,
@@ -64,6 +65,13 @@ import {
   hasSuccessfulSolve,
   getClueSolution,
 } from "../lib/clue-progress";
+import {
+  getNextClueHint,
+  getPreviouslyRevealedHints,
+  getSolveElapsedSeconds,
+  isActiveSolve,
+  normalizeClueHints,
+} from "../lib/clue-hints";
 import {
   getDashboardActivityScope,
   getSolverProgressScope,
@@ -361,6 +369,11 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const validatedHints = normalizeClueHints(parsed.data.hints);
+  if (!validatedHints.valid) {
+    res.status(400).json({ error: "Add between zero and three non-empty hints, each no longer than 300 characters." });
+    return;
+  }
 
   const auth = getAuth(req);
   const profile = await ensureProfile(auth.userId!);
@@ -376,10 +389,11 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
   if (
     containsObjectionableLanguage(parsed.data.clue) ||
     containsObjectionableLanguage(parsed.data.answer) ||
-    containsObjectionableLanguage(parsed.data.wordplay ?? "")
+    containsObjectionableLanguage(parsed.data.wordplay ?? "") ||
+    validatedHints.hints.some(containsObjectionableLanguage)
   ) {
     res.status(400).json({
-      error: "Please remove profanity or hateful language from the clue, answer, and wordplay.",
+      error: "Please remove profanity or hateful language from the clue, answer, wordplay, and hints.",
     });
     return;
   }
@@ -419,6 +433,7 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
           answer: parsed.data.answer.trim(),
           normalizedAnswer: answer,
           wordplay: parsed.data.wordplay?.trim() || null,
+          hints: validatedHints.hints,
           maxAttempts: parsed.data.maxAttempts,
           setterUserId: auth.userId!,
           setterName: profile.publicId,
@@ -459,6 +474,8 @@ router.post("/clues", requireAuth, async (req, res): Promise<void> => {
     userStartedAt: null,
     userSolved: null,
     revealedAnswer: clue.answer,
+    userRevealedHints: [],
+    hintCount: clue.hints.length,
   };
   res.status(201).json(CreateClueResponse.parse(response));
 });
@@ -550,7 +567,7 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
 
   const currentElapsed =
     progress && !progress.solvedAt && !progress.failedAt
-      ? Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000))
+      ? getSolveElapsedSeconds(progress.startedAt, progress.hintsRevealed)
       : progress?.elapsedSeconds ?? null;
   const [ratingStats] = await db
     .select({
@@ -626,12 +643,72 @@ router.get("/clues/:slug", async (req, res): Promise<void> => {
     userElapsedSeconds: currentElapsed,
     userStartedAt: progress?.startedAt ?? null,
     userSolved: progressState.userSolved,
+    userRevealedHints: progress
+      ? getPreviouslyRevealedHints(clue.hints, progress.hintsRevealed)
+      : [],
+    hintCount: clue.hints.length,
     isBlocked: Boolean(clue.blockedAt),
     reportCount: reportSummary ? Number(reportSummary.reportCount) : null,
     appealStatus: appeal?.status ?? null,
     appealReason: appeal?.reason ?? null,
   };
   res.json(GetClueResponse.parse(response));
+});
+
+router.post("/clues/:slug/hints", requireAuth, async (req, res): Promise<void> => {
+  const params = StartClueParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [clue] = await db
+    .select()
+    .from(cluesTable)
+    .where(eq(cluesTable.slug, params.data.slug))
+    .limit(1);
+  if (!clue) {
+    res.status(404).json({ error: "Clue not found." });
+    return;
+  }
+  if (clue.retiredAt || clue.blockedAt) {
+    res.status(410).json({ error: "This clue is no longer available for solving." });
+    return;
+  }
+
+  const userId = getAuth(req).userId!;
+  if (userId === clue.setterUserId) {
+    res.status(403).json({ error: "Setters cannot compete on their own clue." });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const [progress] = await tx
+      .select()
+      .from(solverProgressTable)
+      .where(getSolverProgressScope(clue.id, userId))
+      .for("update")
+      .limit(1);
+    if (!isActiveSolve(progress)) {
+      return { status: 409 as const, error: "Start an active solve before revealing a hint." };
+    }
+    const hint = getNextClueHint(clue.hints, progress.hintsRevealed);
+    if (hint === null) {
+      return { status: 409 as const, error: "No hints remain for this clue." };
+    }
+    const hintsRevealed = progress.hintsRevealed + 1;
+    await tx
+      .update(solverProgressTable)
+      .set({ hintsRevealed })
+      .where(eq(solverProgressTable.id, progress.id));
+    return { status: 200 as const, hint, hintsRevealed };
+  });
+
+  if (result.status === 409) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.json(RevealClueHintResponse.parse(result));
 });
 
 router.post("/clues/:slug/report", requireAuth, async (req, res): Promise<void> => {
@@ -1074,7 +1151,7 @@ router.post(
     const completed = Boolean(progress.solvedAt || progress.failedAt);
     const elapsedSeconds = completed
       ? (progress.elapsedSeconds ?? 0)
-      : Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000));
+      : getSolveElapsedSeconds(progress.startedAt, progress.hintsRevealed);
     res.json(
       StartClueResponse.parse({
         attemptsUsed: progress.attemptsUsed,
@@ -1168,9 +1245,10 @@ router.post(
       const attemptsUsed = progress.attemptsUsed + 1;
       const correct = normalizeAnswer(parsed.data.answer) === clue.normalizedAnswer;
       const completed = correct || attemptsUsed >= clue.maxAttempts;
-      const elapsedSeconds = Math.max(
-        0,
-        Math.floor((now.getTime() - progress.startedAt.getTime()) / 1000),
+      const elapsedSeconds = getSolveElapsedSeconds(
+        progress.startedAt,
+        progress.hintsRevealed,
+        now.getTime(),
       );
       await tx
         .update(solverProgressTable)
@@ -1265,7 +1343,11 @@ router.post(
 
       const elapsedSeconds =
         progress.elapsedSeconds ??
-        Math.max(0, Math.floor((now.getTime() - progress.startedAt.getTime()) / 1000));
+        getSolveElapsedSeconds(
+          progress.startedAt,
+          progress.hintsRevealed,
+          now.getTime(),
+        );
       if (progress.solvedAt || progress.failedAt) {
         return {
           status: 200 as const,

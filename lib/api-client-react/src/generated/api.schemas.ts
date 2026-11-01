@@ -52,6 +52,12 @@ export interface Clue {
   userSolved: boolean | null;
   /** @nullable */
   revealedAnswer: string | null;
+  userRevealedHints: string[];
+  /**
+     * @minimum 0
+     * @maximum 3
+     */
+  hintCount: number;
   isBlocked?: boolean;
   /** @nullable */
   reportCount?: number | null;
@@ -99,6 +105,21 @@ export interface ClueInput {
      * @maximum 10
      */
   maxAttempts: number;
+  /**
+     * @maxItems 3
+     * @items.minLength 1
+     * @items.maxLength 300
+     */
+  hints?: string[];
+}
+
+export interface ClueHintReveal {
+  hint: string;
+  /**
+     * @minimum 1
+     * @maximum 3
+     */
+  hintsRevealed: number;
 }
 
 export interface ClueRetired {

@@ -1,5 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { cluesTable, solverProgressTable } from "@workspace/db/schema";
+import { getSolveElapsedSeconds } from "./clue-hints";
 
 export function getSolverProgressScope(clueId: number, userId: string) {
   return and(
@@ -33,7 +34,7 @@ export function serializeSolverActivity(
   >,
   progress: Pick<
     typeof solverProgressTable.$inferSelect,
-    "attemptsUsed" | "solvedAt" | "failedAt" | "elapsedSeconds" | "startedAt"
+    "attemptsUsed" | "solvedAt" | "failedAt" | "elapsedSeconds" | "startedAt" | "hintsRevealed"
   >,
 ) {
   return {
@@ -48,7 +49,7 @@ export function serializeSolverActivity(
     state: getSolverActivityState(progress),
     elapsedSeconds: progress.solvedAt || progress.failedAt
       ? progress.elapsedSeconds ?? 0
-      : Math.max(0, Math.floor((Date.now() - progress.startedAt.getTime()) / 1000)),
+      : getSolveElapsedSeconds(progress.startedAt, progress.hintsRevealed),
     startedAt: progress.startedAt,
   };
 }

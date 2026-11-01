@@ -453,6 +453,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ClueRetired"
+  /clues/{slug}/hints:
+    post:
+      operationId: revealClueHint
+      tags: [clues]
+      summary: Reveal the next hint during an active solve
+      security:
+        - clerkSession: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The next hint and updated hint count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueHintReveal"
+        "401":
+          description: Sign in to reveal a hint
+        "403":
+          description: Setters cannot solve their own clue
+        "404":
+          description: Clue not found
+        "409":
+          description: An active solve is required or no hints remain
+        "410":
+          description: Clue is retired or blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClueRetired"
   /me/dashboard:
     get:
       operationId: getMyDashboard
@@ -570,7 +604,7 @@ components:
         - status
     Clue:
       type: object
-      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, userHasReported, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer]
+      required: [id, slug, clue, answerLength, maxAttempts, setterName, setterBlurb, averageRating, ratingCount, userRating, userHasReported, createdAt, userAttemptsUsed, userCompleted, userElapsedSeconds, userStartedAt, userSolved, revealedAnswer, userRevealedHints, hintCount]
       properties:
         id: { type: integer }
         slug: { type: string }
@@ -592,6 +626,10 @@ components:
         userStartedAt: { type: ["string", "null"], format: date-time }
         userSolved: { type: ["boolean", "null"] }
         revealedAnswer: { type: ["string", "null"] }
+        userRevealedHints:
+          type: array
+          items: { type: string }
+        hintCount: { type: integer, minimum: 0, maximum: 3 }
         isBlocked: { type: boolean }
         reportCount: { type: ["integer", "null"] }
         appealStatus:
@@ -622,6 +660,16 @@ components:
         answer: { type: string, minLength: 1, maxLength: 40 }
         wordplay: { type: string, minLength: 1, maxLength: 1000 }
         maxAttempts: { type: integer, minimum: 1, maximum: 10 }
+        hints:
+          type: array
+          maxItems: 3
+          items: { type: string, minLength: 1, maxLength: 300 }
+    ClueHintReveal:
+      type: object
+      required: [hint, hintsRevealed]
+      properties:
+        hint: { type: string }
+        hintsRevealed: { type: integer, minimum: 1, maximum: 3 }
     ClueRetired:
       type: object
       required: [error]

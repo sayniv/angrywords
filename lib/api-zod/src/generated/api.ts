@@ -53,14 +53,24 @@ export const createClueBodyWordplayMax = 1000;
 
 export const createClueBodyMaxAttemptsMax = 10;
 
+export const createClueBodyHintsItemMax = 300;
+
+export const createClueBodyHintsMax = 3;
+
 
 
 export const CreateClueBody = zod.object({
   "clue": zod.string().min(createClueBodyClueMin).max(createClueBodyClueMax),
   "answer": zod.string().min(1).max(createClueBodyAnswerMax),
   "wordplay": zod.string().min(1).max(createClueBodyWordplayMax),
-  "maxAttempts": zod.number().int().min(1).max(createClueBodyMaxAttemptsMax)
+  "maxAttempts": zod.number().int().min(1).max(createClueBodyMaxAttemptsMax),
+  "hints": zod.array(zod.string().min(1).max(createClueBodyHintsItemMax)).max(createClueBodyHintsMax).optional()
 })
+
+export const createClueResponseHintCountMin = 0;
+export const createClueResponseHintCountMax = 3;
+
+
 
 export const CreateClueResponse = zod.object({
   "id": zod.number().int(),
@@ -83,6 +93,8 @@ export const CreateClueResponse = zod.object({
   "userStartedAt": zod.coerce.date().nullable(),
   "userSolved": zod.boolean().nullable(),
   "revealedAnswer": zod.string().nullable(),
+  "userRevealedHints": zod.array(zod.string()),
+  "hintCount": zod.number().int().min(createClueResponseHintCountMin).max(createClueResponseHintCountMax),
   "isBlocked": zod.boolean().optional(),
   "reportCount": zod.number().int().nullish(),
   "appealStatus": zod.union([zod.literal('pending'),zod.literal('restored'),zod.literal('retired'),zod.literal(null)]).nullish(),
@@ -108,6 +120,11 @@ export const GetClueParams = zod.object({
   "slug": zod.coerce.string()
 })
 
+export const getClueResponseHintCountMin = 0;
+export const getClueResponseHintCountMax = 3;
+
+
+
 export const GetClueResponse = zod.object({
   "id": zod.number().int(),
   "slug": zod.string(),
@@ -129,6 +146,8 @@ export const GetClueResponse = zod.object({
   "userStartedAt": zod.coerce.date().nullable(),
   "userSolved": zod.boolean().nullable(),
   "revealedAnswer": zod.string().nullable(),
+  "userRevealedHints": zod.array(zod.string()),
+  "hintCount": zod.number().int().min(getClueResponseHintCountMin).max(getClueResponseHintCountMax),
   "isBlocked": zod.boolean().optional(),
   "reportCount": zod.number().int().nullish(),
   "appealStatus": zod.union([zod.literal('pending'),zod.literal('restored'),zod.literal('retired'),zod.literal(null)]).nullish(),
@@ -339,6 +358,23 @@ export const GiveUpClueResponse = zod.object({
   "completed": zod.boolean(),
   "elapsedSeconds": zod.number().int(),
   "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Reveal the next hint during an active solve
+ */
+export const RevealClueHintParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const revealClueHintResponseHintsRevealedMax = 3;
+
+
+
+export const RevealClueHintResponse = zod.object({
+  "hint": zod.string(),
+  "hintsRevealed": zod.number().int().min(1).max(revealClueHintResponseHintsRevealedMax)
 })
 
 

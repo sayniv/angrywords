@@ -29,6 +29,7 @@ import type {
   ClueAppealInput,
   ClueAppealResult,
   ClueAppealReview,
+  ClueHintReveal,
   ClueInput,
   CluePublishLimitError,
   CluePublishQuota,
@@ -1439,6 +1440,80 @@ export const useGiveUpClue = <TError = ErrorType<void | ClueRetired>,
         TContext
       > => {
       return useMutation(getGiveUpClueMutationOptions(options));
+    }
+
+export const getRevealClueHintUrl = (slug: string,) => {
+
+
+
+
+  return `/api/clues/${slug}/hints`
+}
+
+/**
+ * @summary Reveal the next hint during an active solve
+ */
+export const revealClueHint = async (slug: string, options?: Parameters<typeof customFetch>[1]): Promise<ClueHintReveal> => {
+
+  return customFetch<ClueHintReveal>(getRevealClueHintUrl(slug),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevealClueHintMutationKey = () => ['revealClueHint'] as const;
+
+export const getRevealClueHintMutationOptions = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealClueHint>>, TError,RevealClueHintMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revealClueHint>>, TError,RevealClueHintMutationVariables, TContext> => {
+
+const mutationKey = getRevealClueHintMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revealClueHint>>, RevealClueHintMutationVariables> = (props) => {
+          const {slug} = props ?? {};
+
+          return  revealClueHint(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevealClueHintMutationResult = NonNullable<Awaited<ReturnType<typeof revealClueHint>>>
+
+    export type RevealClueHintMutationError = ErrorType<void | ClueRetired>
+    export type RevealClueHintMutationVariables = {slug: string}
+
+    /**
+ * @summary Reveal the next hint during an active solve
+ */
+export const useRevealClueHint = <TError = ErrorType<void | ClueRetired>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revealClueHint>>, TError,RevealClueHintMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revealClueHint>>,
+        TError,
+        RevealClueHintMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevealClueHintMutationOptions(options));
     }
 
 export const getGetMyDashboardUrl = () => {
