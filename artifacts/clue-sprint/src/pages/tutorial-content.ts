@@ -20,7 +20,7 @@ export type TutorialType = {
 export const tutorialIntroduction = {
   title: "How cryptic clues work",
   intro:
-    "A cryptic clue is a little word puzzle with a definition and a wordplay route to the same answer. The definition is often at the beginning or end; the wordplay tells you how to build or find the letters.",
+    "In a regular crossword the clue directly yields the answer. However a cryptic clue is a little word puzzle with a definition and a wordplay - each of which route to the same answer. The definition is often at the beginning or end; the wordplay tells you how to build or find the letters of the answer.",
   parts: [
     {
       term: "Definition",
@@ -32,19 +32,18 @@ export const tutorialIntroduction = {
     },
     {
       term: "Fodder",
-      text: "Letters or words that the clue asks you to rearrange, reverse, hide, or combine.",
+      text: "Letters or words that the clue asks you to rearrange, reverse, hide, or combine. It's the bit of the clue on which the wordplay happens.",
     },
     {
       term: "Indicator",
-      text: "A word that signals an operation, such as “broken” for an anagram or “inside” for a hidden word.",
+      text: "A word that signals the type of wordplay happening. This of it like an instruction on what to do like “broken” for an anagram or “inside” for a hidden word.",
     },
     {
       term: "Enumeration",
-      text: "The number in parentheses gives the answer length. For example, (5) means five letters.",
+      text: "The number in parentheses gives the answer length. For example, (5) means the answer has five letters.",
     },
   ],
-  note:
-    "Not every clue uses every part in the same way. Some clues use more than one device, and double definitions have no separate wordplay.",
+  note: "Not every clue uses every part in the same way. Some clues use more than one device, and double definitions have no separate wordplay. It's ok if all of this feels overwhelming right now, stick with it for a bit and it'll all become clear soon",
 };
 
 const tutorialTypeContent: TutorialType[] = [
@@ -53,56 +52,48 @@ const tutorialTypeContent: TutorialType[] = [
     title: "Charades",
     summary: "Put small word-parts side by side, in order.",
     lesson:
-      "In a charade, each nearby word or phrase contributes a piece. Join the pieces in the order the clue gives them. A separate indicator is not always needed.",
+      "In a charade, each word or phrase contributes a piece of the answer. Join the pieces in the order the clue gives them. A separate indicator is not always needed.",
     examples: [
       {
-        id: "charades-sunset",
-        clue: "The day's close, when a star is set (6)",
-        answer: "SUNSET",
-        definition: "The day's close",
-        fodder: "star; set",
-        indicator: "No special indicator; the pieces sit next to each other.",
-        wordplay: "STAR → SUN; SET → SET; SUN + SET → SUNSET.",
-        hint: "Think of a star that gives us daylight, then use “set” as a verb.",
+        id: "charades-monsoon",
+        clue: "Soon after Monday is rainy season.",
+        answer: "Monsoon",
+        definition: "Rainy season",
+        fodder: "Soon, Monday",
+        indicator: "after",
+        wordplay: "Soon → SOON; Monday → MON; MON+SOON → Monsoon",
+        hint: "Think of another word for rainy season that contains an abbreviation for Monday",
       },
       {
-        id: "charades-ego",
-        clue: "The self: energy, then a trip (3)",
-        answer: "EGO",
-        definition: "The self",
-        fodder: "energy; trip",
-        indicator: "Then tells you to keep the pieces in this order.",
-        wordplay: "Energy is abbreviated E; a trip can be a GO; E + GO → EGO.",
-        hint: "Use the first letter often used for energy, followed by a short journey.",
-      },
-      {
-        id: "charades-rainbow",
-        clue: "A color arc: wet weather, then a bend (7)",
-        answer: "RAINBOW",
-        definition: "A color arc",
-        fodder: "wet weather; bend",
-        indicator: "Then tells you the order.",
-        wordplay: "Wet weather is RAIN; a bend is a BOW; RAIN + BOW → RAINBOW.",
-        hint: "The answer appears after rain, when sunlight bends through droplets.",
+        id: "charades-cobweb",
+        clue: "Corn maze is a spider web",
+        answer: "Cobweb",
+        definition: "Spider web",
+        fodder: "Corn maze",
+        indicator: "none",
+        wordplay: "Corn → Cob; Maze → Web; Cob+Web → Cobweb",
+        hint: "Think of a ear of corn and another word for a maze that a spider might build.",
       },
       {
         id: "charades-cupcake",
-        clue: "A small dessert: drinking vessel followed by a baked treat (7)",
+        clue: "A small treat: drinking vessel followed by a birthday staple (7)",
         answer: "CUPCAKE",
-        definition: "A small dessert",
-        fodder: "drinking vessel; baked treat",
+        definition: "A small treat",
+        fodder: "drinking vessel; birthday staple",
         indicator: "Followed by tells you the order.",
-        wordplay: "A drinking vessel is a CUP; a baked treat is a CAKE; CUP + CAKE → CUPCAKE.",
+        wordplay:
+          "A drinking vessel is a CUP; a birthday staple is a CAKE; CUP + CAKE → CUPCAKE.",
         hint: "Join the two food-related things named in the clue.",
       },
       {
         id: "charades-starfish",
-        clue: "A sea creature: celebrity, then a swimmer (8)",
+        clue: "A sea dweller: celebrity, then a swimmer (8)",
         answer: "STARFISH",
         definition: "A sea creature",
         fodder: "celebrity; swimmer",
         indicator: "Then tells you the order.",
-        wordplay: "A celebrity can be a STAR; a swimmer is a FISH; STAR + FISH → STARFISH.",
+        wordplay:
+          "A celebrity can be a STAR; a swimmer is a FISH; STAR + FISH → STARFISH.",
         hint: "The first part is someone famous; the second lives in water.",
       },
     ],
@@ -115,14 +106,14 @@ const tutorialTypeContent: TutorialType[] = [
       "Anagram indicators suggest disorder or change: “broken”, “scrambled”, “mixed”, or “disturbed”. The fodder supplies exactly the letters to rearrange.",
     examples: [
       {
-        id: "anagram-silent",
-        clue: "Quiet when LISTEN is scrambled (6)",
-        answer: "SILENT",
-        definition: "Quiet",
-        fodder: "LISTEN",
-        indicator: "Scrambled",
-        wordplay: "Rearrange LISTEN → SILENT; SILENT means quiet.",
-        hint: "Check that every letter in LISTEN is used once.",
+        id: "anagram-enlist",
+        clue: "Tinsel breaks to join (6)",
+        answer: "ENLIST",
+        definition: "Join",
+        fodder: "TINSEL",
+        indicator: "breaks",
+        wordplay: "Rearrange TINSEL → ENLIST; ENLIST means to join.",
+        hint: "Can the letters of tinsel be broken up an rearranged to form a word that means join?",
       },
       {
         id: "anagram-alert",
@@ -210,7 +201,8 @@ const tutorialTypeContent: TutorialType[] = [
         definition: "Slippery fish",
         fodder: "WHEEL",
         indicator: "Tucked inside",
-        wordplay: "WHEEL contains E-E-L consecutively; an EEL is a slippery fish.",
+        wordplay:
+          "WHEEL contains E-E-L consecutively; an EEL is a slippery fish.",
         hint: "Look at the final three letters of WHEEL.",
       },
       {
@@ -220,7 +212,8 @@ const tutorialTypeContent: TutorialType[] = [
         definition: "Mineral",
         fodder: "STOREHOUSE",
         indicator: "Concealed in",
-        wordplay: "STOREHOUSE contains O-R-E consecutively; ORE is a mineral-bearing rock.",
+        wordplay:
+          "STOREHOUSE contains O-R-E consecutively; ORE is a mineral-bearing rock.",
         hint: "The answer starts at the third letter of STOREHOUSE.",
       },
     ],
@@ -298,7 +291,8 @@ const tutorialTypeContent: TutorialType[] = [
         definition: "Carry-all",
         fodder: "B (boat’s first); A (article); G (sailing’s last)",
         indicator: "Hold",
-        wordplay: "B and G are the outside letters; A goes between them: B(A)G → BAG.",
+        wordplay:
+          "B and G are the outside letters; A goes between them: B(A)G → BAG.",
         hint: "Take one outer letter from each named word, then place A inside.",
       },
       {
@@ -484,8 +478,10 @@ const tutorialTypeContent: TutorialType[] = [
         answer: "BARK",
         definition: "A dog’s sound; a tree’s outer layer",
         fodder: "None",
-        indicator: "No wordplay indicator; the two definitions sit side by side.",
-        wordplay: "BARK is both the sound a dog makes and the covering of a tree.",
+        indicator:
+          "No wordplay indicator; the two definitions sit side by side.",
+        wordplay:
+          "BARK is both the sound a dog makes and the covering of a tree.",
         hint: "The same word names a noise and part of a tree.",
       },
       {
@@ -505,7 +501,8 @@ const tutorialTypeContent: TutorialType[] = [
         definition: "A flow of water; happening now",
         fodder: "None",
         indicator: "No wordplay indicator; look for two meanings.",
-        wordplay: "CURRENT can mean a flow and can also mean happening at present.",
+        wordplay:
+          "CURRENT can mean a flow and can also mean happening at present.",
         hint: "One meaning moves through water; the other describes the present.",
       },
       {
@@ -515,7 +512,8 @@ const tutorialTypeContent: TutorialType[] = [
         definition: "A contest; a stick that lights a flame",
         fodder: "None",
         indicator: "No wordplay indicator; the clue gives two definitions.",
-        wordplay: "MATCH is both a contest and a small stick used to light a flame.",
+        wordplay:
+          "MATCH is both a contest and a small stick used to light a flame.",
         hint: "The word can name both a game and something struck to make fire.",
       },
     ],
