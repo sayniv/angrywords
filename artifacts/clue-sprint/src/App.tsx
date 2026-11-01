@@ -31,6 +31,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import NotFound from '@/pages/not-found';
+import TutorialPage from '@/pages/tutorial';
 import {
   Link, Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter,
 } from 'wouter';
@@ -133,18 +134,23 @@ function ClerkRoutes() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <ClerkCacheSync />
-      <ProfileGate>
-        <Switch>
-          <Route path="/" component={HomeRedirect} />
-          <Route path="/sign-in/*?" component={SignInPage} />
-          <Route path="/sign-up/*?" component={SignUpPage} />
-          <Route path="/create" component={CreateGate} />
-          <Route path="/clue/:slug" component={ChallengePage} />
-          <Route path="/dashboard" component={DashboardGate} />
-          <Route path="/review" component={ReviewerGate} />
-          <Route component={NotFound} />
-        </Switch>
-      </ProfileGate>
+      <Switch>
+        <Route path="/tutorial" component={TutorialRoute} />
+        <Route>
+          <ProfileGate>
+            <Switch>
+              <Route path="/" component={HomeRedirect} />
+              <Route path="/sign-in/*?" component={SignInPage} />
+              <Route path="/sign-up/*?" component={SignUpPage} />
+              <Route path="/create" component={CreateGate} />
+              <Route path="/clue/:slug" component={ChallengePage} />
+              <Route path="/dashboard" component={DashboardGate} />
+              <Route path="/review" component={ReviewerGate} />
+              <Route component={NotFound} />
+            </Switch>
+          </ProfileGate>
+        </Route>
+      </Switch>
     </ClerkProvider>
   );
 }
@@ -316,7 +322,11 @@ function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' }) {
+function TutorialRoute() {
+  return <><Header active="tutorial" /><TutorialPage /><Footer /></>;
+}
+
+function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' | 'tutorial' }) {
   const { isSignedIn } = useUser();
   const { data: profile } = useGetMyProfile({
     query: { queryKey: getGetMyProfileQueryKey(), enabled: Boolean(isSignedIn) },
@@ -329,6 +339,7 @@ function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' }) {
         <Brand />
         <nav className="hidden items-center gap-8 md:flex">
           <Link href="/" className={`nav-link ${active === 'browse' ? 'nav-active' : ''}`}>Explore clues</Link>
+          <Link href="/tutorial" className={`nav-link ${active === 'tutorial' ? 'nav-active' : ''}`}>Learn cryptics</Link>
           {isSignedIn && <Link href="/dashboard" className={`nav-link ${active === 'dashboard' ? 'nav-active' : ''}`}>My page</Link>}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
@@ -349,6 +360,7 @@ function Header({ active = 'browse' }: { active?: 'browse' | 'dashboard' }) {
       </div>
       {mobileOpen && <div className="mobile-menu md:hidden">
         <Link href="/" className="nav-link" onClick={() => setMobileOpen(false)}>Explore clues</Link>
+        <Link href="/tutorial" className={`nav-link ${active === 'tutorial' ? 'nav-active' : ''}`} onClick={() => setMobileOpen(false)}>Learn cryptics</Link>
         {isSignedIn && <Link href="/dashboard" className="nav-link" onClick={() => setMobileOpen(false)}>My page</Link>}
         {isSignedIn ? <Link href="/create" className="button button-primary" onClick={() => setMobileOpen(false)}>Set a clue <PenLine size={15} /></Link> : <Link href="/sign-in" className="button button-primary" onClick={() => setMobileOpen(false)}>Sign in <ArrowRight size={15} /></Link>}
       </div>}
